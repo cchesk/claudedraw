@@ -7,10 +7,13 @@ import http from 'node:http';
 import zlib from 'node:zlib';
 import { buildQuery } from '../shared/overpassQuery.js';
 
+// Probed from Render (Oct 2026): overpass.openstreetmap.fr answers in ~1s; overpass-api.de refuses datacenter IPs and
+// the others time out, so they are only fallbacks. Override with OVERPASS_URLS. /probe shows how each one is doing.
 const DEFAULT_UPSTREAMS = [
-  'https://overpass-api.de/api/interpreter',
+  'https://overpass.openstreetmap.fr/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
 ];
 const UA = 'StreetQuest/1.0 (+https://github.com/cchesk/claudedraw)';
 

@@ -47,5 +47,5 @@ export const PHOTON_URL = env.VITE_PHOTON_URL ?? 'https://photon.komoot.io';
 /** Caching Overpass proxy (server/, deployed as the street-quest-api Render service). Set VITE_API_URL="" to go direct only. */
 export const API_URL = (env.VITE_API_URL ?? 'https://street-quest-api.onrender.com').replace(/\/$/, '');
 export const OVERPASS_URLS = (env.VITE_OVERPASS_URL ??
-  'https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter,https://overpass.openstreetmap.fr/api/interpreter')
+  'https://overpass-api.de/api/interpreter,https://overpass.openstreetmap.fr/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter')
   .split(',').map((s) => s.trim()).filter(Boolean);
