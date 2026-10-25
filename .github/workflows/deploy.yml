@@ -8,7 +8,7 @@ on:
 
 jobs:
   api:
-    uses: ./.github/workflows/deploy-app.yml
+    uses: cchesk/infra/.github/workflows/deploy-app.yml@main
     with:
       name: streetquest-api
       type: node
@@ -20,7 +20,7 @@ jobs:
 
   site:
     needs: api
-    uses: ./.github/workflows/deploy-app.yml
+    uses: cchesk/infra/.github/workflows/deploy-app.yml@main
     with:
       name: streetquest
       type: static

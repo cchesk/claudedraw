@@ -76,4 +76,4 @@ committed OSM fixtures and `?demo=1`.
 ## Deploy (own server)
 
 `.github/workflows/deploy.yml` also deploys every push to `main` to the apps server: the site at `streetquest.<domain>`,
-the proxy at `streetquest-api.<domain>`. The setup is reusable by any repo: [`deploy/README.md`](deploy/README.md).
+the proxy at `streetquest-api.<domain>`. The server setup and the reusable deploy workflow live in [`cchesk/infra`](https://github.com/cchesk/infra).
