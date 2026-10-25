@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1521">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Street Quest: explore the real streets around any address and find nearby landmarks.">
+<title>Street Quest</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 36 36'%3E%3Crect x='2' y='2' width='32' height='32' rx='9' fill='%23C8F04A'/%3E%3Cpath d='M10 24 L18 10 L26 24 Z' fill='%230F1521'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body class="fluid">
+<div id="stage">
+
+<!-- SCREEN 1: CHARACTER -->
+<section id="s-character" class="screen setup dots active" aria-label="Pick your character">
+  <header class="top"><div class="logo"><svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect x="2" y="2" width="32" height="32" rx="9" fill="#C8F04A"/><path d="M10 24 L18 10 L26 24 Z" fill="#0F1521"/></svg>STREET QUEST</div><nav class="steps" aria-label="Setup steps"><span class="step current" aria-current="step">01<span class="long"> CHARACTER</span></span><span class="step-link"></span><span class="step">02<span class="long"> LOCATION</span></span><span class="step-link"></span><span class="step">03<span class="long"> EXPLORE</span></span></nav></header>
+  <div>
+    <h1>Pick your character</h1>
+    <p class="lede">Each explorer moves through the city a little differently.</p>
+  </div>
+  <div class="cards" id="cards" role="group" aria-label="Characters"></div>
+  <footer class="foot">
+    <span class="hint desktop-only">← → to browse · ENTER to choose</span>
+    <button class="btn btn-primary" id="to-location">Continue as <span id="cta-name">Courier</span> <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg></button>
+  </footer>
+</section>
+
+<!-- SCREEN 2: LOCATION -->
+<section id="s-location" class="screen setup dots" aria-label="Pick location">
+  <header class="top"><div class="logo"><svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect x="2" y="2" width="32" height="32" rx="9" fill="#C8F04A"/><path d="M10 24 L18 10 L26 24 Z" fill="#0F1521"/></svg>STREET QUEST</div><nav class="steps" aria-label="Setup steps"><span class="step done">✓<span class="long"> CHARACTER</span></span><span class="step-link done"></span><span class="step current" aria-current="step">02<span class="long"> LOCATION</span></span><span class="step-link"></span><span class="step">03<span class="long"> EXPLORE</span></span></nav></header>
+  <div class="loc-body">
+    <div class="loc-left">
+      <div>
+        <h1>Pick location</h1>
+        <p class="lede">Your quest starts on a real street. Type any address to drop in.</p>
+      </div>
+      <div>
+        <label for="addr" class="label">ADDRESS</label>
+        <div class="field">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8F04A" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          <input id="addr" type="text" placeholder="Street, city or landmark" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" role="combobox" aria-expanded="false" aria-controls="suggest" aria-autocomplete="list">
+          <button class="icon-btn" id="clear" type="button" aria-label="Clear address"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+        </div>
+      </div>
+      <div class="suggest" id="suggest" role="listbox" aria-label="Suggestions"></div>
+      <p class="notice" id="loc-note" role="status" aria-live="polite"></p>
+      <div class="loc-actions">
+        <button class="btn btn-ghost" id="back" type="button">Back</button>
+        <button class="btn btn-primary" id="start" type="button" disabled>Start exploring <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg></button>
+      </div>
+    </div>
+    <div class="preview" id="preview">
+      <canvas id="preview-canvas" aria-hidden="true"></canvas>
+      <div class="preview-empty" id="preview-empty">Pick an address to preview the real streets around it.</div>
+      <div class="pin" id="pin" aria-hidden="true"><i></i><i></i><svg width="44" height="44" viewBox="0 0 44 44"><path d="M22 40 c-9 -9 -14 -15 -14 -21 a14 14 0 0 1 28 0 c0 6 -5 12 -14 21z" fill="#FF8A65"/><circle cx="22" cy="19" r="5" fill="#0F1521"/></svg></div>
+      <div class="preview-card">
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+          <span class="eyebrow" style="color:var(--coral)">STARTING POINT</span>
+          <span id="preview-addr" style="font-weight:600;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">No address yet</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px"><span id="preview-avatar"></span><span id="preview-name" style="font-size:14px;color:var(--muted)">Courier</span></div>
+      </div>
+      <span class="attrib attrib-preview">© OpenStreetMap contributors</span>
+    </div>
+  </div>
+</section>
+
+<!-- LOADING -->
+<section id="s-loading" class="screen setup dots" aria-label="Building your map">
+  <header class="top"><div class="logo"><svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect x="2" y="2" width="32" height="32" rx="9" fill="#C8F04A"/><path d="M10 24 L18 10 L26 24 Z" fill="#0F1521"/></svg>STREET QUEST</div></header>
+  <div class="loading-body">
+    <div class="spinner" aria-hidden="true"></div>
+    <h1 class="loading-title">Building your map</h1>
+    <p class="lede" id="loading-addr"></p>
+    <p class="progress" id="loading-step" role="status" aria-live="polite">Finding streets…</p>
+    <div class="loading-error" id="loading-error" hidden>
+      <p id="loading-msg"></p>
+      <div class="loc-actions" style="margin-top:0">
+        <button class="btn btn-primary" id="loading-retry" type="button">Retry</button>
+        <button class="btn btn-ghost" id="loading-other" type="button">Pick another location</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SCREEN 3: MAP -->
+<section id="s-map" class="screen" aria-label="Explore">
+  <div id="viewport"><canvas id="map-canvas" aria-label="Map of the neighborhood" role="img"></canvas>
+    <div id="player"><div class="ring"></div><div class="arrow"></div><div class="avatar"></div></div>
+  </div>
+
+  <div id="stick-zone" class="touch-only" aria-hidden="true"></div>
+  <div id="stick" class="touch-only idle" aria-hidden="true"><div id="knob"></div></div>
+  <button id="run" class="touch-only" type="button" aria-label="Run (hold)">RUN<small>HOLD</small></button>
+
+  <div class="hud hud-char">
+    <div id="hud-portrait" class="portrait-sm"></div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span id="hud-name" class="nm">Courier</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="bar" role="meter" aria-label="Stamina" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100" id="stamina-meter"><i id="stamina" style="width:100%"></i></div>
+        <span class="bar-label">STAMINA</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud hud-street" aria-live="polite">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF8A65" stroke-width="2.2" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0114 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+    <span id="street"></span>
+  </div>
+
+  <div class="hud-tr">
+    <button class="hud hud-pause" id="pause" type="button" aria-label="Pause">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="2" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="11" y="2" width="4" height="14" rx="1.5" fill="currentColor"/></svg></button>
+    <div class="hud hud-mini" style="position:relative">
+      <canvas id="minimap" role="img" aria-label="Minimap"></canvas>
+      <span class="n">N</span>
+    </div>
+  </div>
+
+  <div class="hud hud-quest">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="eyebrow" style="color:var(--lime)">CURRENT QUEST</span>
+      <span id="quest-count" style="font-family:var(--mono);font-size:12px;color:var(--muted)">0 / 3</span>
+    </div>
+    <span id="quest-title" class="qt">Find 3 landmarks nearby</span>
+    <div id="quest-bars" class="qbars"></div>
+  </div>
+
+  <div class="hud hud-keys desktop-only">
+    <div style="display:flex;flex-direction:column;gap:4px;padding-bottom:6px">
+      <span class="eyebrow" style="color:var(--muted)">MOVE</span>
+      <span style="font-size:13px;color:var(--muted)">Streets only · SHIFT runs</span>
+    </div>
+    <div class="keys" aria-hidden="true"><span></span><kbd data-k="w">W</kbd><span></span><kbd data-k="a">A</kbd><kbd data-k="s">S</kbd><kbd data-k="d">D</kbd></div>
+  </div>
+
+  <span class="attrib attrib-map">© OpenStreetMap contributors</span>
+  <div class="toast" id="toast" role="status"></div>
+
+  <div class="overlay" id="paused" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <div class="modal">
+      <h2 id="paused-title">Paused</h2>
+      <p class="rotate-hint touch-only">Drag on the left side to move. Hold RUN to sprint. You can only walk on streets.</p>
+      <button class="btn btn-primary" id="resume" type="button">Resume</button>
+      <button class="btn btn-ghost" id="change-loc" type="button">Change location</button>
+      <button class="btn btn-ghost" id="change-char" type="button">Change character</button>
+      <p class="rotate-hint">Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a></p>
+    </div>
+  </div>
+</section>
+
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

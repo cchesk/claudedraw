@@ -1,0 +1,12 @@
+:root{
+  --ink:#0F1521; --panel:#161E2F; --panel-2:#1C2236; --raised:#222C42; --line:#2A3550; --track:#26314A;
+  --text:#EEF2F8; --muted:#9AA6BD; --lime:#C8F04A; --coral:#FF8A65; --sky:#6EC1FF;
+  --display:'Bricolage Grotesque',system-ui,sans-serif; --body:Inter,system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+  --g:24px; /* HUD inset */
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --map-ground:#172033; --map-building:#1F2A42; --map-building-tall:#22304B; --map-water:#1A2E4A; --map-park:#1C3A2E;
+  --map-tree:#245040; --map-path:#2D5C49; --map-street:#2E3A56; --map-dash:#44527A; --map-label:#8592AE;
+}
