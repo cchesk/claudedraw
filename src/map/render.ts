@@ -108,6 +108,8 @@ export class TileCache {
   private tiles = new Map<string, { canvas: HTMLCanvasElement; used: number; sig: string }>();
   private tick = 0;
   scale = 1;
+  /** how many tile bitmaps have been painted so far (a thrashing cache would make this explode) */
+  renders = 0;
   readonly px: number;
   constructor(private world: World, private max = 48, private makeCanvas: () => HTMLCanvasElement = () => document.createElement('canvas')) { this.px = world.mode === 'mercator' ? 512 : (world.half * PX_PER_M) / 2; }
 
@@ -139,6 +141,7 @@ export class TileCache {
     if (!sig) return t?.canvas ?? null;
     if (!t || (canCreate && t.sig !== sig)) {
       if (!canCreate) return null;
+      this.renders++;
       const c = t?.canvas ?? this.makeCanvas();
       c.width = c.height = Math.ceil(this.px * this.scale);
       const ctx = c.getContext('2d')!;

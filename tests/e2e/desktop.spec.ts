@@ -85,3 +85,25 @@ test('desktop: the map is endless — running far loads more chunks and stays on
   await page.screenshot({ path: 'test-results/endless-map.png' });
   expect(errs).toEqual([]);
 });
+
+test('desktop: running through dozens of tiles does not thrash the tile cache', async ({ page }) => {
+  test.setTimeout(120_000);
+  const errs = collectErrors(page);
+  await page.goto('/?demo=1');
+  await page.keyboard.press('ArrowLeft'); await page.keyboard.press('ArrowLeft'); // Scout
+  await page.click('#to-location');
+  await page.fill('#addr', '221 maple');
+  await page.locator('.opt[data-i="0"]').click();
+  await page.click('#start');
+  await expect(page.locator('#s-map')).toBeVisible();
+  await page.keyboard.down('d'); await page.keyboard.down('Shift');
+  await expect.poll(async () => (await worldPos(page)).x, { timeout: 60000 }).toBeGreaterThan(9000);
+  await page.keyboard.up('d'); await page.keyboard.up('Shift');
+  // Each tile bitmap is painted once when it scrolls into view (plus a redraw when new chunk data lands). A cache that
+  // evicts what it just drew would repaint tiles every frame: thousands of renders and tiles flickering in and out.
+  const renders = Number(await page.locator('#s-map').getAttribute('data-tile-renders'));
+  expect(renders).toBeGreaterThan(30);
+  expect(renders).toBeLessThan(600);
+  expect(Number(await page.locator('#s-map').getAttribute('data-chunks'))).toBeGreaterThan(5);
+  expect(errs).toEqual([]);
+});

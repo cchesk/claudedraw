@@ -229,7 +229,7 @@ function draw(now = 0) {
   $('#stamina-meter').setAttribute('aria-valuenow', String(Math.round(state.stamina)));
   const name = streetNameAt(m, x, y) || lastStreet;
   if (name !== lastStreet) { $('#street').textContent = name; lastStreet = name; }
-  if (frame % 2 === 0) { drawMini(m, x, y); setNetNote(); }
+  if (frame % 2 === 0) { drawMini(m, x, y); setNetNote(); $('#s-map').dataset.tileRenders = String(tiles.renders); }
 }
 
 function drawMini(m: NonNullable<typeof state.map>, x: number, y: number) {
