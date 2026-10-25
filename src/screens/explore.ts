@@ -5,7 +5,7 @@ import { initKeyboard, updateKeycaps } from '../input/keyboard';
 import { initTouch, resetTouch } from '../input/touch';
 import { view } from '../layout';
 import { isWalkable, nearestRoadPoint, streetNameAt } from '../map/collision';
-import { chunkFetcher } from '../map/pipeline';
+import { chunkLoader } from '../map/pipeline';
 import { drawLabels, drawMinimap, drawStar, pickScale, TileCache } from '../map/render';
 import { pickLandmarks } from '../map/spawn';
 import { Streamer } from '../map/streamer';
@@ -109,7 +109,7 @@ export function enterExplore() {
   lastStreet = ''; walking = false; blocked = false; frame = 0;
   used = new Set(state.landmarks.map((l) => l.key).filter((x): x is string => !!x));
   tiles = new TileCache(m);
-  streamer = new Streamer(m, chunkFetcher(m, state.demo), () => { $('#s-map').dataset.chunks = String(m.chunks.size); });
+  streamer = new Streamer(m, chunkLoader(m, state.demo), () => { $('#s-map').dataset.chunks = String(m.chunks.size); });
   $('#s-map').dataset.chunks = String(m.chunks.size);
   layoutMetrics();
   updateQuest();

@@ -1,8 +1,8 @@
-import type { Phase } from '../geo/overpass';
-import type { OverpassData } from './build';
 import type { World } from './world';
 
-export type Fetcher = (i: number, j: number, phase: Phase, signal?: AbortSignal) => Promise<OverpassData>;
+export type Phase = 'roads' | 'detail';
+/** Fetches AND ingests one chunk (phase) into the world. Real tiles load everything in the 'roads' phase. */
+export type Fetcher = (i: number, j: number, phase: Phase, signal?: AbortSignal) => Promise<void>;
 export type StreamStatus = 'idle' | 'loading' | 'error';
 /** closer than this to an unloaded chunk's edge: its streets jump the queue */
 const URGENT_PX = 300;
@@ -71,9 +71,8 @@ export class Streamer {
     const fk = `${t.i},${t.j},${t.phase}`;
     const ctl = (this.ctl = new AbortController());
     try {
-      const data = await this.fetcher(t.i, t.j, t.phase, ctl.signal);
+      await this.fetcher(t.i, t.j, t.phase, ctl.signal);
       if (this.disposed) return;
-      this.world.ingest(data, t.i, t.j, t.phase);
       this.failures.delete(fk);
       this.onLoaded(t.i, t.j, t.phase);
       this.status = 'idle';

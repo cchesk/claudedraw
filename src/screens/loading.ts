@@ -1,4 +1,4 @@
-import { OverpassError } from '../geo/overpass';
+import { TileError } from '../geo/tiles';
 import { findSpawn, pickLandmarks } from '../map/spawn';
 import { loadMap, NotEnoughStreets } from '../map/pipeline';
 import { CHARS } from '../data/characters';
@@ -39,10 +39,10 @@ async function run() {
     if (mine.signal.aborted) return;
     let msg = 'Something went wrong while building the map.';
     if (e instanceof NotEnoughStreets) msg = e.message;
-    else if (e instanceof OverpassError && e.kind === 'timeout') msg = 'The map server took too long to answer. Please retry in a moment.';
-    else if (e instanceof OverpassError) msg = "Couldn't reach the map server. Check your connection and retry.";
+    else if (e instanceof TileError && e.kind === 'timeout') msg = 'The map tiles took too long to arrive. Please retry in a moment.';
+    else if (e instanceof TileError) msg = "Couldn't reach the map tile server. Check your connection and retry.";
     console.warn('map load failed', e);
-    $('#loading-msg').textContent = msg + (e instanceof OverpassError ? `\n(${e.detail})` : e instanceof NotEnoughStreets ? '' : `\n(${e instanceof Error ? e.message : e})`);
+    $('#loading-msg').textContent = msg + (e instanceof TileError ? `\n(${e.detail})` : e instanceof NotEnoughStreets ? '' : `\n(${e instanceof Error ? e.message : e})`);
     $('#loading-error').hidden = false;
     $('#loading-step').textContent = '';
     scr.classList.add('failed');

@@ -1,5 +1,5 @@
 import { COLORS, PX_PER_M, ROAD_DRAW_EXTRA } from '../config';
-import type { Area, Chunk, Label, Road, Vec } from './types';
+import type { Area, Label, Road, Vec } from './types';
 import type { World } from './world';
 
 export interface PaintOpts { trees: boolean; buildings: boolean; dash: boolean }
@@ -103,45 +103,45 @@ export function drawLabels(ctx: CanvasRenderingContext2D, labels: readonly Label
   c.letterSpacing = '0px';
 }
 
-/** Lazily rendered, LRU-cached offscreen tiles (spec §6.7). A tile never straddles two fetched chunks. */
+/** Lazily rendered, LRU-cached offscreen tiles (spec §6.7). A render tile may straddle several fetched chunks. */
 export class TileCache {
-  private tiles = new Map<string, { canvas: HTMLCanvasElement; used: number; rev: number }>();
+  private tiles = new Map<string, { canvas: HTMLCanvasElement; used: number; sig: string }>();
   private tick = 0;
   scale = 1;
   readonly px: number;
-  constructor(private world: World, private max = 48) { this.px = (world.half * PX_PER_M) / 2; }
+  constructor(private world: World, private max = 48) { this.px = world.mode === 'mercator' ? 512 : (world.half * PX_PER_M) / 2; }
 
   setScale(s: number) { if (Math.abs(s - this.scale) / this.scale > 0.25) { this.scale = s; this.tiles.clear(); } }
   clear() { this.tiles.clear(); }
 
-  private chunkOf(tx: number, ty: number): Chunk | undefined {
-    const c = this.world.chunkAt((tx + 0.5) * this.px, (ty + 0.5) * this.px);
-    return this.world.chunks.get(this.world.chunkKey(c.i, c.j));
-  }
+  private rect(tx: number, ty: number): Rect { return { x0: tx * this.px, y0: ty * this.px, x1: (tx + 1) * this.px, y1: (ty + 1) * this.px }; }
+  /** identifies which chunk data a tile was drawn from, so it can be redrawn when more arrives */
+  private sig(r: Rect) { return this.world.chunksIn(r).map((c) => `${c.i},${c.j}:${c.rev}`).join('|'); }
 
-    has(tx: number, ty: number) { return this.tiles.has(`${tx},${ty}`); }
+  has(tx: number, ty: number) { return this.tiles.has(`${tx},${ty}`); }
 
-  /** True when the tile exists but its chunk has gained data (e.g. buildings arrived) since it was drawn. */
+  /** True when the tile exists but its chunks have gained data (e.g. buildings arrived) since it was drawn. */
   isStale(tx: number, ty: number) {
     const t = this.tiles.get(`${tx},${ty}`);
-    return !!t && t.rev !== this.chunkOf(tx, ty)?.rev;
+    return !!t && t.sig !== this.sig(this.rect(tx, ty));
   }
 
-  /** The tile canvas (re-rendering it first if allowed and stale), or null if its chunk has no data yet. */
+  /** The tile canvas (re-rendering it first if allowed and needed), or null if no chunk covering it has data yet. */
   get(tx: number, ty: number, canCreate = true): HTMLCanvasElement | null {
     const key = `${tx},${ty}`;
     let t = this.tiles.get(key);
-    const chunk = this.chunkOf(tx, ty);
-    if (!chunk || !chunk.roadsLoaded) return t?.canvas ?? null;
-    if (!t || (canCreate && t.rev !== chunk.rev)) {
+    const r = this.rect(tx, ty), sig = this.sig(r);
+    if (!sig) return t?.canvas ?? null;
+    if (!t || (canCreate && t.sig !== sig)) {
       if (!canCreate) return null;
       const c = t?.canvas ?? document.createElement('canvas');
       c.width = c.height = Math.ceil(this.px * this.scale);
       const ctx = c.getContext('2d')!;
       ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
-      ctx.translate(-tx * this.px, -ty * this.px);
-      paintFeatures(ctx, chunk.roads, chunk.areas, { x0: tx * this.px, y0: ty * this.px, x1: (tx + 1) * this.px, y1: (ty + 1) * this.px });
-      this.tiles.set(key, (t = { canvas: c, used: 0, rev: chunk.rev }));
+      ctx.translate(-r.x0, -r.y0);
+      const f = this.world.featuresIn(r);
+      paintFeatures(ctx, f.roads, f.areas, r);
+      this.tiles.set(key, (t = { canvas: c, used: 0, sig }));
       if (this.tiles.size > this.max) this.evict();
     }
     t.used = ++this.tick;

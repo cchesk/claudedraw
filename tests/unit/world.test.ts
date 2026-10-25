@@ -8,7 +8,7 @@ import { World } from '../../src/map/world';
 import { loadFixture, rng } from './helpers';
 
 const demoWorld = () => { const w = new World(40, -75, 400); w.ingest(demoChunk(w.chunkBBox(0, 0)), 0, 0); return w; };
-const demoFetch = (w: World) => async (i: number, j: number, phase: 'roads' | 'detail') => demoChunk(w.chunkBBox(i, j), phase);
+const demoFetch = (w: World) => async (i: number, j: number, phase: 'roads' | 'detail') => { w.ingest(demoChunk(w.chunkBBox(i, j), phase), i, j, phase); };
 const flush = () => new Promise<void>((r) => setImmediate(r));
 
 describe('chunk grid', () => {
@@ -78,7 +78,7 @@ describe('two-phase chunks (streets first, detail later)', () => {
     const w = new World(40, -75, 400);
     w.ingest(demoChunk(w.chunkBBox(0, 0), 'roads'), 0, 0, 'roads');
     const order: string[] = [];
-    const s = new Streamer(w, async (i, j, phase) => { order.push(`${i},${j},${phase}`); await flush(); return demoChunk(w.chunkBBox(i, j), phase); }, () => {}, 900, () => 0);
+    const s = new Streamer(w, async (i, j, phase) => { order.push(`${i},${j},${phase}`); await flush(); w.ingest(demoChunk(w.chunkBBox(i, j), phase), i, j, phase); }, () => {}, 900, () => 0);
     s.update(0, 0);                      // centre of chunk (0,0): neighbours' edges are 800px away, so nothing is urgent
     await flush(); await flush();
     expect(order).toEqual(['0,0,detail']);
@@ -87,7 +87,7 @@ describe('two-phase chunks (streets first, detail later)', () => {
     const w = new World(40, -75, 400);
     w.ingest(demoChunk(w.chunkBBox(0, 0), 'roads'), 0, 0, 'roads');
     const order: string[] = [];
-    const s = new Streamer(w, async (i, j, phase) => { order.push(`${i},${j},${phase}`); await flush(); return demoChunk(w.chunkBBox(i, j), phase); }, () => {}, 900, () => 0);
+    const s = new Streamer(w, async (i, j, phase) => { order.push(`${i},${j},${phase}`); await flush(); w.ingest(demoChunk(w.chunkBBox(i, j), phase), i, j, phase); }, () => {}, 900, () => 0);
     for (let n = 0; n < 12; n++) { s.update(700, 0); await flush(); await flush(); }
     expect(order[0]).toBe('1,0,roads');            // streets of the chunk we're heading into come first
     expect(order.indexOf('0,0,detail')).toBeGreaterThan(0);
@@ -111,7 +111,7 @@ describe('Streamer', () => {
       calls++; inflight++; maxInflight = Math.max(maxInflight, inflight);
       await flush(); inflight--;
       if (fail) throw new Error('boom');
-      return demoChunk(w.chunkBBox(i, j), phase);
+      w.ingest(demoChunk(w.chunkBBox(i, j), phase), i, j, phase);
     }, () => {}, 700, () => now);
     s.update(700, 0); s.update(700, 0); s.update(700, 0);
     await flush(); await flush();

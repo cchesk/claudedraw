@@ -1,8 +1,8 @@
 import { CHARS } from '../data/characters';
 import { createGeocoder, type Place } from '../geo/geocoder';
-import { OverpassError } from '../geo/overpass';
+import { TileError } from '../geo/tiles';
 import { view } from '../layout';
-import { chunkFetcher, loadMap } from '../map/pipeline';
+import { loadMap } from '../map/pipeline';
 import type { World } from '../map/world';
 import { LOW, paintFeatures } from '../map/render';
 import { state } from '../state';
@@ -59,23 +59,19 @@ async function drawPreview(p: Place) {
     ctx.fillStyle = '#172033'; ctx.fillRect(0, 0, w, h);
     ctx.translate(w / 2, h * 0.44);
     ctx.scale(s, s);
-    const chunk = map.chunks.get('0,0')!;
     const half = (Math.max(w, h) / s) / 2 + 40;
-    paintFeatures(ctx, chunk.roads, chunk.areas, { x0: -half, y0: -half - 200, x1: half, y1: half + 200 }, LOW);
+    const r = { x0: -half, y0: -half - 200, x1: half, y1: half + 200 };
+    const f = map.featuresIn(r);
+    paintFeatures(ctx, f.roads, f.areas, r, LOW);
     box.classList.add('has-map', 'has-pin');
   };
   try {
-    // streets first (fast), then buildings/parks are painted over them when they arrive
     const map = await loadMap(p.lat, p.lng, { demo: state.demo, signal: ctl.signal });
     if (ctl.signal.aborted) return;
     paint(map);
-    try {
-      map.ingest(await chunkFetcher(map, state.demo)(0, 0, 'detail', ctl.signal), 0, 0, 'detail');
-      if (!ctl.signal.aborted) paint(map);
-    } catch { /* the street-only preview is fine */ }
   } catch (e) {
     if (ctl.signal.aborted) return;
-    $('#preview-empty').textContent = `Preview unavailable right now. You can still start exploring.${e instanceof OverpassError ? ' (' + e.detail + ')' : ''}`;
+    $('#preview-empty').textContent = `Preview unavailable right now. You can still start exploring.${e instanceof TileError ? ' (' + e.detail + ')' : ''}`;
     console.warn('preview failed', e);
   }
 }

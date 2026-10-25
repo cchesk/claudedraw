@@ -1,37 +1,60 @@
-import { BBOX_HALF_M, BBOX_RETRY_HALF_M } from '../config';
-import { chunkCacheKey, fetchChunk, OverpassError, type Phase } from '../geo/overpass';
+import { fetchTile, TILE_Z, tileOf, TileError } from '../geo/tiles';
 import { demoChunk } from './demo';
-import type { OverpassData } from './build';
+import { decodeTile } from './mvt';
+import type { Phase } from './streamer';
 import { hasEnoughStreets, World } from './world';
 
 export class NotEnoughStreets extends Error {
   constructor() { super('Not enough streets around here — try a more central address.'); }
 }
 
-/** Fetch one phase of the OSM data for chunk (i,j) of a world (or the synthetic demo data behind ?demo=1). */
-export function chunkFetcher(world: World, demo: boolean) {
-  return async (i: number, j: number, phase: Phase, signal?: AbortSignal): Promise<OverpassData> => {
-    const bbox = world.chunkBBox(i, j);
-    if (demo) return demoChunk(bbox, phase);
-    return fetchChunk(chunkCacheKey(world.lat0, world.lng0, world.half, i, j, phase), bbox, phase, signal);
+/** Demo grids are centred squares of this half-size (metres). */
+const DEMO_HALF_M = 400;
+
+export function newWorld(lat: number, lng: number, demo: boolean) {
+  return demo ? new World(lat, lng, DEMO_HALF_M) : World.mercator(lat, lng);
+}
+
+/** Fetch + ingest one chunk of a world: an OpenFreeMap vector tile, or the synthetic demo grid behind ?demo=1. */
+export function chunkLoader(world: World, demo: boolean) {
+  return async (i: number, j: number, phase: Phase, signal?: AbortSignal): Promise<void> => {
+    if (demo) { world.ingest(demoChunk(world.chunkBBox(i, j), phase), i, j, phase); return; }
+    if (phase === 'detail') return; // tiles arrive complete
+    const buf = await fetchTile(i, j, signal);
+    if (signal?.aborted) throw new TileError('aborted', 'aborted');
+    world.ingestTile(i, j, decodeTile(buf, i, j, world.proj));
   };
 }
 
-export interface PipelineOpts { demo: boolean; signal?: AbortSignal; onStep?: (n: 0 | 1 | 2) => void; halfM?: number }
+export interface PipelineOpts { demo: boolean; signal?: AbortSignal; onStep?: (n: 0 | 1 | 2) => void }
 
-/** geocoded point → Overpass (streets only, small and fast) → World with the centred chunk playable; buildings and parks follow in the background. Retries at 700m if too sparse (spec §6.2). */
+/**
+ * geocoded point → vector tile(s) → World, playable. The tile under the origin is loaded first (≈0.3 s); neighbours
+ * join if the origin is near an edge or the area is sparse (spec §6.2 retry), so the nearest street is never missed.
+ */
 export async function loadMap(lat: number, lng: number, o: PipelineOpts): Promise<World> {
-  const sizes = [o.halfM ?? BBOX_HALF_M, BBOX_RETRY_HALF_M];
-  for (const half of sizes) {
-    o.onStep?.(0);
-    const world = new World(lat, lng, half);
-    const data = await chunkFetcher(world, o.demo)(0, 0, 'roads', o.signal);
-    o.onStep?.(1);
-    await new Promise((r) => setTimeout(r, 0)); // let the progress text paint before the CPU-heavy build
-    world.ingest(data, 0, 0, 'roads');
-    if (hasEnoughStreets(world)) { o.onStep?.(2); return world; }
+  const world = newWorld(lat, lng, o.demo);
+  const load = chunkLoader(world, o.demo);
+  const home = world.chunkAt(0, 0);
+  // distance (world px) from the origin to a chunk's rectangle; 900 px = 450 m
+  const near = (i: number, j: number) => {
+    const r = world.chunkRect(i, j);
+    return Math.hypot(Math.max(r.x0, 0, -r.x1), Math.max(r.y0, 0, -r.y1)) <= 900;
+  };
+  o.onStep?.(0);
+  await load(home.i, home.j, 'roads', o.signal);
+  o.onStep?.(1);
+  await new Promise((r) => setTimeout(r, 0)); // let the progress text paint
+  const ring = [-1, 0, 1].flatMap((dj) => [-1, 0, 1].map((di) => ({ i: home.i + di, j: home.j + dj }))).filter((c) => !(c.i === home.i && c.j === home.j));
+  // neighbours the origin is close to (a street just across the tile edge may be the nearest one)
+  await Promise.all(ring.filter((c) => near(c.i, c.j)).map((c) => load(c.i, c.j, 'roads', o.signal)));
+  if (!hasEnoughStreets(world)) {
+    await Promise.all(ring.filter((c) => !world.hasChunk(c.i, c.j)).map((c) => load(c.i, c.j, 'roads', o.signal)));
+    if (!hasEnoughStreets(world)) throw new NotEnoughStreets();
   }
-  throw new NotEnoughStreets();
+  world.pickMain();
+  o.onStep?.(2);
+  return world;
 }
 
-export { OverpassError };
+export { TILE_Z, tileOf };

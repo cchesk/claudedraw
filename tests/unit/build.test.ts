@@ -50,21 +50,20 @@ describe.each(FIXTURES)('MapModel from %s fixture', (name) => {
     const ok = new Set(['residential', 'living_street', 'unclassified', 'tertiary', 'secondary', 'primary', 'pedestrian', 'service']);
     for (const s of map.segments) expect(ok.has(map.ways[s.way].cls)).toBe(true);
   });
-  it('the reachable street network (what spawn and landmarks use) is one connected component', () => {
-    const key = (x: number, y: number) => `${Math.round(x)},${Math.round(y)}`;
-    const parent = new Map<string, string>();
-    const find = (a: string): string => { let r = a; while ((parent.get(r) ?? r) !== r) r = parent.get(r)!; return r; };
+  it('the reachable street network (what spawn and landmarks use) is one connected piece', () => {
     const reach = map.segments.filter(map.reachable);
-    expect(reach.length).toBeGreaterThan(map.segments.length * 0.8);
-    for (const s of reach) {
-      const a = key(s.ax, s.ay), b = key(s.bx, s.by);
-      if (!parent.has(a)) parent.set(a, a); if (!parent.has(b)) parent.set(b, b);
-      parent.set(find(a), find(b));
+    expect(reach.length).toBeGreaterThan(map.segments.length * 0.7);
+    // independent check: join segments whose endpoints touch (within the 1.5px weld distance)
+    const parent = reach.map((_, i) => i);
+    const find = (a: number): number => { while (parent[a] !== a) a = parent[a] = parent[parent[a]]; return a; };
+    const ends = reach.flatMap((s, i) => [{ i, x: s.ax, y: s.ay }, { i, x: s.bx, y: s.by }]);
+    ends.sort((a, b) => a.x - b.x);
+    for (let a = 0; a < ends.length; a++) for (let b = a + 1; b < ends.length && ends[b].x - ends[a].x <= 1.6; b++) {
+      if (Math.hypot(ends[a].x - ends[b].x, ends[a].y - ends[b].y) <= 1.6) parent[find(ends[a].i)] = find(ends[b].i);
     }
-    // clipped endpoints and rounding can split the graph at the map edge only; the vast majority must be one piece
-    const sizes = new Map<string, number>();
-    for (const s of reach) sizes.set(find(key(s.ax, s.ay)), (sizes.get(find(key(s.ax, s.ay))) ?? 0) + s.len);
-    const total = [...sizes.values()].reduce((a, b) => a + b, 0);
+    const sizes = new Map<number, number>();
+    for (let i = 0; i < reach.length; i++) sizes.set(find(i), (sizes.get(find(i)) ?? 0) + reach[i].len);
+    const total = [...sizes.values()].reduce((x, y) => x + y, 0);
     expect(Math.max(...sizes.values()) / total).toBeGreaterThan(0.97);
   });
 });

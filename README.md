@@ -16,14 +16,15 @@ npm run build      # type-check + production build into dist/
 
 ## How it works
 
-`address → Photon geocoder → Overpass (bbox ±400 m, retry ±700 m) → MapModel → canvas render + collision`
+`address → Photon geocoder → OpenFreeMap vector tiles (z14, OpenStreetMap data) → World → canvas render + collision`
 
 | Area | Files |
 |---|---|
 | Geocoder (pluggable, default Photon) | `src/geo/geocoder.ts` |
-| Overpass query, IndexedDB cache (7 days), abort, endpoint fallback | `src/geo/overpass.ts` |
+| Vector tiles: TileJSON, fetch, memo | `src/geo/tiles.ts` |
 | Projection | `src/geo/project.ts` |
-| OSM → MapModel (walkable set, street graph, areas, labels, POIs) | `src/map/build.ts`, tunables in `src/config.ts` |
+| Tile decoding + walkable set | `src/map/mvt.ts`, tunables in `src/config.ts` |
+| World: chunks, street graph, labels, POIs | `src/map/world.ts` |
 | Streets-only collision (`isWalkable`, slide, corner assist) | `src/map/collision.ts` |
 | Spawn snapping and landmarks | `src/map/spawn.ts` |
 | Per-frame simulation shared by game and fuzz test | `src/game/frame.ts`, `src/game/rules.ts` |
@@ -40,9 +41,8 @@ that passes `isWalkable`.
 
 ### Fixtures
 
-`tests/fixtures/*.json` are small real OSM extracts (Boston downtown, Arlington MA suburb, Boston Common/Public Garden),
-stored in Overpass `out geom` shape so tests never touch the network. Regenerate with
-`node scripts/make-fixture.mjs <name> <lat> <lng> <halfMetres>` (uses the OSM API).
+`tests/fixtures/tiles/*.pbf` are real OpenFreeMap z14 tiles (Boston downtown + neighbours, Arlington MA, a sparse rural
+tile); `tests/fixtures/*.json` are small real OSM extracts in Overpass `out geom` shape. Tests never touch the network.
 
 ### Configuration
 
@@ -50,20 +50,24 @@ Optional `VITE_*` variables are listed in `.env.example`. No key is needed by de
 
 ### Usage policies
 
-Photon (photon.komoot.io) and the public Overpass servers are shared community services: requests are debounced
-(250 ms autocomplete, 600 ms preview), cancelled with `AbortController`, de-duplicated, cached in IndexedDB, and
-Overpass calls are spaced ≥1 s apart. For real traffic, point `VITE_OVERPASS_URL` at your own instance and use a
-commercial geocoder (`VITE_GEOCODER=geoapify`).
+Photon (photon.komoot.io) is a shared community service: requests are debounced (250 ms autocomplete, 600 ms
+preview) and cancelled with `AbortController`. OpenFreeMap tiles are static CDN files with long cache lifetimes and are
+memoised in memory. For real traffic use a commercial geocoder (`VITE_GEOCODER=geoapify`).
 
-## Map proxy (`server/`)
+## Map data: OpenFreeMap vector tiles
 
-Public Overpass servers are slow and some refuse cloud IPs, so the site asks a small Node proxy first
-(`street-quest-api` on Render, zero dependencies): `GET /overpass?phase=roads|detail&south=&west=&north=&east=`.
-It runs the same two fixed queries as the browser (`shared/overpassQuery.js`), caches them in memory for every player
-(gzip, LRU, 7 days, serves stale on upstream errors), de-duplicates concurrent requests, hedges across mirrors and
-sends a proper User-Agent. `/probe` times each upstream from the server's network (`?urls=a,b` to try others).
-If the proxy is slow or down, the browser also asks public Overpass directly after a few seconds.
-Configure with `VITE_API_URL` (client) and `OVERPASS_URLS` / `ALLOWED_ORIGINS` (server).
+The public Overpass servers turned out to be too slow and unreliable (some refuse cloud IPs), so the map comes from
+[OpenFreeMap](https://openfreemap.org) instead: free, keyless, CDN-served OpenStreetMap vector tiles in the
+OpenMapTiles schema (spec §12 q2 allows this). A z14 tile is ~1.8 km wide, 70–500 KB, answers in ~0.3 s and carries
+real street names (`transportation_name`), road classes, buildings, parks, water and named POIs.
+`src/geo/tiles.ts` finds the current tile URL via TileJSON and fetches tiles; `src/map/mvt.ts` decodes them and applies
+the spec §6.4 walkable set to the OpenMapTiles attributes; `World.ingestTile()` welds roads across tile edges.
+Tiles stream in as you walk toward an edge. Attribution (© OpenStreetMap contributors · OpenFreeMap · OpenMapTiles) is
+shown on the map.
+
+`server/` + `shared/` are a legacy Overpass caching proxy from an earlier iteration. Nothing uses them any more
+(the `street-quest-api` Render service can be deleted); the Overpass-shaped `World.ingest()` path is kept for the
+committed OSM fixtures and `?demo=1`.
 
 ## Deploy (Render Static Site)
 
