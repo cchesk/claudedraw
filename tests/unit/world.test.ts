@@ -74,6 +74,15 @@ describe('two-phase chunks (streets first, detail later)', () => {
     expect(c.areas.length).toBeGreaterThan(5); expect(c.rev).toBeGreaterThan(rev);
     expect(w.pois.length).toBeGreaterThan(0); // landmarks come from the streets phase
   });
+  it('the chunk we stand in gets its buildings before far-away neighbours get their streets', async () => {
+    const w = new World(40, -75, 400);
+    w.ingest(demoChunk(w.chunkBBox(0, 0), 'roads'), 0, 0, 'roads');
+    const order: string[] = [];
+    const s = new Streamer(w, async (i, j, phase) => { order.push(`${i},${j},${phase}`); await flush(); return demoChunk(w.chunkBBox(i, j), phase); }, () => {}, 900, () => 0);
+    s.update(0, 0);                      // centre of chunk (0,0): neighbours' edges are 800px away, so nothing is urgent
+    await flush(); await flush();
+    expect(order).toEqual(['0,0,detail']);
+  });
   it('streamer fetches missing streets before any detail, then detail nearest-first', async () => {
     const w = new World(40, -75, 400);
     w.ingest(demoChunk(w.chunkBBox(0, 0), 'roads'), 0, 0, 'roads');

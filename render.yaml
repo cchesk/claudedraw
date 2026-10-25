@@ -1,5 +1,20 @@
-# Render Blueprint: Street Quest as a Static Site (no backend).
+# Render Blueprint: the Street Quest static site plus a tiny caching Overpass proxy (street-quest-api).
+# The proxy is optional: without it (VITE_API_URL="") the browser talks to public Overpass servers directly.
 services:
+  - type: web
+    runtime: node
+    name: street-quest-api
+    repo: https://github.com/cchesk/claudedraw
+    branch: main
+    plan: free # free sleeps after ~15 min idle (the site pings /health on load to wake it); use starter to keep it warm
+    autoDeployTrigger: commit
+    buildCommand: echo "zero-dependency server, nothing to build"
+    startCommand: node server/index.mjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+
   - type: web
     runtime: static
     name: street-quest

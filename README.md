@@ -55,6 +55,16 @@ Photon (photon.komoot.io) and the public Overpass servers are shared community s
 Overpass calls are spaced ≥1 s apart. For real traffic, point `VITE_OVERPASS_URL` at your own instance and use a
 commercial geocoder (`VITE_GEOCODER=geoapify`).
 
+## Map proxy (`server/`)
+
+Public Overpass servers are slow and some refuse cloud IPs, so the site asks a small Node proxy first
+(`street-quest-api` on Render, zero dependencies): `GET /overpass?phase=roads|detail&south=&west=&north=&east=`.
+It runs the same two fixed queries as the browser (`shared/overpassQuery.js`), caches them in memory for every player
+(gzip, LRU, 7 days, serves stale on upstream errors), de-duplicates concurrent requests, hedges across mirrors and
+sends a proper User-Agent. `/probe` times each upstream from the server's network (`?urls=a,b` to try others).
+If the proxy is slow or down, the browser also asks public Overpass directly after a few seconds.
+Configure with `VITE_API_URL` (client) and `OVERPASS_URLS` / `ALLOWED_ORIGINS` (server).
+
 ## Deploy (Render Static Site)
 
 `render.yaml` defines the site. Build `npm ci && npm run build`, publish `dist`, auto-deploy on push to `main`.
