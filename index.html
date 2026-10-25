@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Map Walker</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root { --bg:#10131a; --panel:#1b2030; --fg:#f2f4f8; --accent:#ffb703; --muted:#8b93a7; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; overscroll-behavior:none; }
+  #setup { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:16px; z-index:2000; background:var(--bg); overflow:auto; }
+  .card { background:var(--panel); border-radius:16px; padding:24px; width:100%; max-width:440px; }
+  h1 { margin:0 0 4px; font-size:1.6rem; }
+  p.sub { margin:0 0 20px; color:var(--muted); }
+  label { display:block; font-weight:600; margin:16px 0 8px; }
+  .chars { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .chars button { font-size:2rem; padding:10px 0; background:#262d42; border:2px solid transparent; border-radius:12px; cursor:pointer; }
+  .chars button[aria-pressed="true"] { border-color:var(--accent); background:#33304a; }
+  input[type=text] { width:100%; padding:12px; font-size:1rem; border-radius:10px; border:2px solid #262d42; background:#0d1017; color:var(--fg); }
+  input[type=text]:focus { outline:none; border-color:var(--accent); }
+  #go { width:100%; margin-top:20px; padding:14px; font-size:1.05rem; font-weight:700; border:0; border-radius:12px; background:var(--accent); color:#1a1300; cursor:pointer; }
+  #go:disabled { opacity:.6; cursor:wait; }
+  #err { color:#ff7b7b; min-height:1.2em; margin:10px 0 0; font-size:.9rem; }
+  #game { position:fixed; inset:0; display:none; }
+  #map { position:absolute; inset:0; }
+  .hero { font-size:34px; line-height:1; text-align:center; filter:drop-shadow(0 2px 3px rgba(0,0,0,.5)); transition:transform .1s; }
+  .hero.flip span { display:inline-block; transform:scaleX(-1); }
+  #hud { position:absolute; top:10px; left:10px; right:10px; z-index:1000; display:flex; gap:8px; align-items:center; pointer-events:none; }
+  #hud .pill { pointer-events:auto; background:rgba(16,19,26,.85); color:var(--fg); padding:8px 12px; border-radius:999px; font-size:.85rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #hud .grow { flex:1; min-width:0; }
+  #hud button { pointer-events:auto; border:0; background:rgba(16,19,26,.85); color:var(--fg); padding:8px 12px; border-radius:999px; font-size:.85rem; cursor:pointer; }
+  #dpad { position:absolute; right:18px; bottom:28px; z-index:1000; width:150px; height:150px; display:none; touch-action:none; user-select:none; -webkit-user-select:none; }
+  #dpad button { position:absolute; width:50px; height:50px; border:0; border-radius:12px; background:rgba(16,19,26,.75); color:#fff; font-size:1.3rem; touch-action:none; }
+  #dpad .u { left:50px; top:0; } #dpad .d { left:50px; bottom:0; } #dpad .l { left:0; top:50px; } #dpad .r { right:0; top:50px; }
+  #dpad button.on { background:var(--accent); color:#000; }
+  @media (pointer:coarse), (max-width:700px) { #dpad { display:block; } #keys { display:none; } }
+</style>
+</head>
+<body>
+<div id="setup">
+  <form class="card" id="form">
+    <h1>🗺️ Map Walker</h1>
+    <p class="sub">Pick a character and a place, then walk around the real map.</p>
+    <label>Character</label>
+    <div class="chars" id="chars"></div>
+    <label for="addr">Address or place</label>
+    <input type="text" id="addr" placeholder="e.g. 1600 Pennsylvania Ave, Washington DC" autocomplete="off" required>
+    <p id="err" role="alert"></p>
+    <button id="go" type="submit">Start walking</button>
+  </form>
+</div>
+
+<div id="game">
+  <div id="map"></div>
+  <div id="hud">
+    <div class="pill grow" id="place"></div>
+    <div class="pill" id="keys">WASD / arrows</div>
+    <button id="back">Change</button>
+  </div>
+  <div id="dpad">
+    <button class="u" data-dir="up">▲</button>
+    <button class="l" data-dir="left">◀</button>
+    <button class="r" data-dir="right">▶</button>
+    <button class="d" data-dir="down">▼</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function () {
+  var CHARACTERS = ['🧙','🥷','🦸','🧑‍🚀','🤖','🦊','🐱','🐶','🐸','🦄','🐢','👻'];
+  var SPEED_MPS = 40;             // walking speed in meters/second (game scale)
+  var selected = CHARACTERS[0];
+  var map, hero, marker, raf, last;
+  var pos = { lat: 0, lng: 0 };
+  var keys = {};                  // from keyboard
+  var pad = {};                   // from touch buttons
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // --- character picker
+  var charsEl = $('chars');
+  CHARACTERS.forEach(function (c, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = c; b.setAttribute('aria-label', 'Character ' + (i + 1));
+    b.setAttribute('aria-pressed', i === 0);
+    b.onclick = function () {
+      selected = c;
+      Array.prototype.forEach.call(charsEl.children, function (x) { x.setAttribute('aria-pressed', x === b); });
+    };
+    charsEl.appendChild(b);
+  });
+
+  // --- geocoding (OpenStreetMap Nominatim)
+  function geocode(q) {
+    return fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=' + encodeURIComponent(q))
+      .then(function (r) { if (!r.ok) throw new Error('Lookup failed'); return r.json(); })
+      .then(function (res) {
+        if (!res.length) throw new Error('Could not find that address. Try adding a city.');
+        return { lat: parseFloat(res[0].lat), lng: parseFloat(res[0].lon), name: res[0].display_name };
+      });
+  }
+
+  $('form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = $('go'); btn.disabled = true; btn.textContent = 'Searching…'; $('err').textContent = '';
+    geocode($('addr').value.trim()).then(startGame).catch(function (err) {
+      $('err').textContent = err.message || 'Something went wrong.';
+    }).then(function () { btn.disabled = false; btn.textContent = 'Start walking'; });
+  });
+
+  $('back').onclick = function () {
+    cancelAnimationFrame(raf); raf = null;
+    $('game').style.display = 'none'; $('setup').style.display = 'flex';
+  };
+
+  // --- game
+  function icon() {
+    return L.divIcon({ className: '', iconSize: [40, 40], iconAnchor: [20, 20],
+      html: '<div class="hero" id="hero"><span>' + selected + '</span></div>' });
+  }
+
+  function startGame(loc) {
+    pos = { lat: loc.lat, lng: loc.lng };
+    $('setup').style.display = 'none';
+    $('game').style.display = 'block';
+    $('place').textContent = '📍 ' + loc.name;
+
+    if (!map) {
+      map = L.map('map', { zoomControl: false, keyboard: false, zoomSnap: 0.5 });
+      L.control.zoom({ position: 'bottomleft' }).addTo(map);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+    }
+    map.invalidateSize();
+    map.setView([pos.lat, pos.lng], 18, { animate: false });
+    if (marker) marker.remove();
+    marker = L.marker([pos.lat, pos.lng], { icon: icon(), interactive: false, keyboard: false }).addTo(map);
+    last = null;
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+
+  function tick(t) {
+    raf = requestAnimationFrame(tick);
+    var dt = last ? Math.min((t - last) / 1000, 0.1) : 0; last = t;
+    var dx = (keys.right || pad.right ? 1 : 0) - (keys.left || pad.left ? 1 : 0);
+    var dy = (keys.up || pad.up ? 1 : 0) - (keys.down || pad.down ? 1 : 0);
+    if (!dx && !dy) return;
+    var len = Math.hypot(dx, dy); dx /= len; dy /= len;
+    // moves are in screen terms, so speed feels the same at any zoom
+    var mpp = 156543.03 * Math.cos(pos.lat * Math.PI / 180) / Math.pow(2, map.getZoom());
+    var meters = Math.max(SPEED_MPS, mpp * 120) * dt;   // at least ~120px/s on screen
+    pos.lat += (dy * meters) / 111320;
+    pos.lng += (dx * meters) / (111320 * Math.cos(pos.lat * Math.PI / 180));
+    pos.lat = Math.max(-85, Math.min(85, pos.lat));
+    marker.setLatLng([pos.lat, pos.lng]);
+    map.panTo([pos.lat, pos.lng], { animate: false });
+    var h = document.getElementById('hero');
+    if (h && dx) h.classList.toggle('flip', dx < 0);
+  }
+
+  // --- keyboard
+  var KEYMAP = { w:'up', a:'left', s:'down', d:'right', arrowup:'up', arrowleft:'left', arrowdown:'down', arrowright:'right' };
+  function key(e, v) {
+    if (e.target && e.target.tagName === 'INPUT') return;
+    var k = KEYMAP[e.key.toLowerCase()];
+    if (k) { keys[k] = v; e.preventDefault(); }
+  }
+  addEventListener('keydown', function (e) { key(e, true); });
+  addEventListener('keyup', function (e) { key(e, false); });
+  addEventListener('blur', function () { keys = {}; pad = {}; });
+
+  // --- touch d-pad (pointer events handle touch + mouse)
+  Array.prototype.forEach.call(document.querySelectorAll('#dpad button'), function (b) {
+    var d = b.dataset.dir;
+    function set(v) { return function (e) { e.preventDefault(); pad[d] = v; b.classList.toggle('on', v); }; }
+    b.addEventListener('pointerdown', set(true));
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { b.addEventListener(ev, set(false)); });
+    b.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  });
+})();
+</script>
+</body>
+</html>
