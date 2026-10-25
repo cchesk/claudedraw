@@ -59,7 +59,7 @@ export async function cachePut(key: string, data: OverpassData) {
 }
 
 export class OverpassError extends Error {
-  constructor(public kind: 'network' | 'timeout' | 'aborted', msg: string) { super(msg); }
+  constructor(public kind: 'network' | 'timeout' | 'aborted', msg: string, public detail = msg) { super(msg); }
 }
 
 const inflight = new Map<string, Promise<OverpassData>>();
@@ -74,7 +74,8 @@ async function fetchRemote(query: string, signal?: AbortSignal): Promise<Overpas
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     lastRequestAt = Date.now();
     const ctl = new AbortController();
-    const timer = setTimeout(() => ctl.abort(), 30000);
+    const timer = setTimeout(() => ctl.abort(), 22000);
+    const host = new URL(url).host;
     const onAbort = () => ctl.abort();
     signal?.addEventListener('abort', onAbort);
     try {
@@ -83,15 +84,18 @@ async function fetchRemote(query: string, signal?: AbortSignal): Promise<Overpas
         headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
         body: 'data=' + encodeURIComponent(query),
       });
-      if (r.status === 429 || r.status === 504 || r.status >= 500) { lastErr = new OverpassError('timeout', `Overpass ${r.status}`); continue; }
-      if (!r.ok) { lastErr = new OverpassError('network', `Overpass ${r.status}`); continue; }
+      if (r.status === 429 || r.status === 504 || r.status >= 500) { lastErr = new OverpassError('timeout', `Overpass ${r.status}`, `${host} answered ${r.status}`); continue; }
+      if (!r.ok) {
+        const body = (await r.text().catch(() => '')).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 160);
+        lastErr = new OverpassError('network', `Overpass ${r.status}`, `${host} answered ${r.status} ${body}`); continue;
+      }
       const json = (await r.json()) as OverpassData & { remark?: string };
-      if (!Array.isArray(json.elements)) { lastErr = new OverpassError('timeout', json.remark ?? 'Overpass returned no data'); continue; }
-      if (json.remark && /timed out|out of memory/i.test(json.remark) && json.elements.length === 0) { lastErr = new OverpassError('timeout', json.remark); continue; }
+      if (!Array.isArray(json.elements)) { lastErr = new OverpassError('timeout', json.remark ?? 'Overpass returned no data', `${host}: ${json.remark ?? 'no elements in reply'}`); continue; }
+      if (json.remark && /timed out|out of memory/i.test(json.remark) && json.elements.length === 0) { lastErr = new OverpassError('timeout', json.remark, `${host}: ${json.remark}`); continue; }
       return json;
     } catch (e) {
       if (signal?.aborted) throw new OverpassError('aborted', 'aborted');
-      lastErr = ctl.signal.aborted ? new OverpassError('timeout', 'Overpass timed out') : new OverpassError('network', String(e));
+      lastErr = ctl.signal.aborted ? new OverpassError('timeout', 'Overpass timed out', `${host} did not answer in time`) : new OverpassError('network', String(e), `${host} unreachable (${e instanceof Error ? e.message : e})`);
     } finally {
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);

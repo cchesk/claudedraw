@@ -42,7 +42,7 @@ async function run() {
     else if (e instanceof OverpassError && e.kind === 'timeout') msg = 'The map server took too long to answer. Please retry in a moment.';
     else if (e instanceof OverpassError) msg = "Couldn't reach the map server. Check your connection and retry.";
     console.warn('map load failed', e);
-    $('#loading-msg').textContent = msg;
+    $('#loading-msg').textContent = msg + (e instanceof OverpassError ? `\n(${e.detail})` : e instanceof NotEnoughStreets ? '' : `\n(${e instanceof Error ? e.message : e})`);
     $('#loading-error').hidden = false;
     $('#loading-step').textContent = '';
     scr.classList.add('failed');

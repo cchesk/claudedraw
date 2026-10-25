@@ -45,5 +45,5 @@ export const GEOCODER = env.VITE_GEOCODER ?? 'photon';
 export const GEOAPIFY_KEY = env.VITE_GEOAPIFY_KEY ?? '';
 export const PHOTON_URL = env.VITE_PHOTON_URL ?? 'https://photon.komoot.io';
 export const OVERPASS_URLS = (env.VITE_OVERPASS_URL ??
-  'https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter')
+  'https://overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter,https://overpass.openstreetmap.fr/api/interpreter')
   .split(',').map((s) => s.trim()).filter(Boolean);

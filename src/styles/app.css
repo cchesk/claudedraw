@@ -216,7 +216,7 @@ body.fluid .loading-title{font-size:34px}
 .progress{margin:0;font-family:var(--mono);font-size:14px;color:var(--lime)}
 .loading-error{display:flex;flex-direction:column;align-items:center;gap:18px;max-width:520px}
 .loading-error[hidden]{display:none}
-.loading-error p{margin:0;font-size:18px;color:var(--text)}
+.loading-error p{white-space:pre-line;margin:0;font-size:18px;color:var(--text)}
 .loading-error .loc-actions{flex-wrap:wrap;justify-content:center}
 .spinner{width:56px;height:56px;border-radius:50%;border:4px solid var(--track);border-top-color:var(--lime);animation:spin 1s linear infinite}
 .failed .spinner{display:none}

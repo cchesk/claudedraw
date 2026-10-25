@@ -1,5 +1,6 @@
 import { CHARS } from '../data/characters';
 import { createGeocoder, type Place } from '../geo/geocoder';
+import { OverpassError } from '../geo/overpass';
 import { view } from '../layout';
 import { loadMap } from '../map/pipeline';
 import { LOW, paintMap } from '../map/render';
@@ -63,7 +64,7 @@ async function drawPreview(p: Place) {
     box.classList.add('has-map', 'has-pin');
   } catch (e) {
     if (ctl.signal.aborted) return;
-    $('#preview-empty').textContent = 'Preview unavailable right now. You can still start exploring.';
+    $('#preview-empty').textContent = `Preview unavailable right now. You can still start exploring.${e instanceof OverpassError ? ' (' + e.detail + ')' : ''}`;
     console.warn('preview failed', e);
   }
 }
