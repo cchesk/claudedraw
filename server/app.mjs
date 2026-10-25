@@ -151,7 +151,9 @@ export function createApp(opts = {}) {
         } catch (e) { out.tinyQuery = { error: String(e?.cause?.code ?? e?.message ?? e), ms: Date.now() - t1 }; }
         return out;
       };
-      return json(req, res, 200, await Promise.all(upstreams.map(probe)));
+      // ?urls=a,b lets us try other mirrors without redeploying (only https Overpass-looking endpoints)
+      const extra = (u.searchParams.get('urls') ?? '').split(',').filter((x) => /^https:\/\/[a-z0-9.-]*overpass[a-z0-9.-]*\/[a-z0-9/_-]*interpreter$/i.test(x)).slice(0, 8);
+      return json(req, res, 200, await Promise.all((extra.length ? extra : upstreams).map(probe)));
     }
     if (u.pathname !== '/overpass') return json(req, res, 404, { error: 'not found' });
     const q = parse(u);
