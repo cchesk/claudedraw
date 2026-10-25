@@ -1,5 +1,4 @@
-# Push to main -> test, build, join the tailnet, rsync to the Hetzner box over Tailscale SSH, restart the proxy.
-# Setup (once): deploy/README.md.
+# Street Quest on the apps server: the map proxy at streetquest-api.<domain>, the site at streetquest.<domain>.
 name: Deploy
 
 on:
@@ -7,51 +6,26 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: deploy
-  cancel-in-progress: false
-
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    if: vars.SITE_URL != ''
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
+  api:
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      name: streetquest-api
+      type: node
+      start: node server/index.mjs
+      health_path: /health
+    secrets:
+      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+      TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-      - run: npm test
-      - run: npm run build
-        env:
-          VITE_API_URL: ${{ vars.SITE_URL }}:8443
-
-      - uses: tailscale/github-action@v3
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-
-      - name: Upload and restart
-        env:
-          SITE_URL: ${{ vars.SITE_URL }}
-        run: |
-          host="${SITE_URL#https://}"
-          ssh="ssh -o StrictHostKeyChecking=accept-new"
-          rsync -az --delete --delay-updates -e "$ssh" dist server shared "deploy@$host:/srv/street-quest/"
-          $ssh "deploy@$host" 'sudo /usr/bin/systemctl restart street-quest-api'
-
-      - name: Health check
-        env:
-          SITE_URL: ${{ vars.SITE_URL }}
-        run: |
-          for i in $(seq 1 15); do
-            curl -fsS "$SITE_URL:8443/health" && curl -fsS -o /dev/null "$SITE_URL/" && exit 0
-            sleep 2
-          done
-          echo "site or proxy not answering at $SITE_URL" >&2
-          exit 1
+  site:
+    needs: api
+    uses: ./.github/workflows/deploy-app.yml
+    with:
+      name: streetquest
+      type: static
+      build: npm ci && npm test && VITE_API_URL=https://streetquest-api.$APPS_DOMAIN npm run build
+      dir: dist
+    secrets:
+      TS_OAUTH_CLIENT_ID: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+      TS_OAUTH_SECRET: ${{ secrets.TS_OAUTH_SECRET }}

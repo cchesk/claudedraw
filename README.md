@@ -69,7 +69,7 @@ Configure with `VITE_API_URL` (client) and `OVERPASS_URLS` / `ALLOWED_ORIGINS` (
 
 `render.yaml` defines the site. Build `npm ci && npm run build`, publish `dist`, auto-deploy on push to `main`.
 
-## Deploy (own server on Tailscale)
+## Deploy (own server)
 
-`.github/workflows/deploy.yml` also deploys every push to `main` to a private server on your tailnet (site + proxy).
-One-time setup: [`deploy/README.md`](deploy/README.md).
+`.github/workflows/deploy.yml` also deploys every push to `main` to the apps server: the site at `streetquest.<domain>`,
+the proxy at `streetquest-api.<domain>`. The setup is reusable by any repo: [`deploy/README.md`](deploy/README.md).
