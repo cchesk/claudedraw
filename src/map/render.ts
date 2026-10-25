@@ -105,7 +105,7 @@ export function drawLabels(ctx: CanvasRenderingContext2D, labels: readonly Label
 
 /** Lazily rendered, LRU-cached offscreen tiles (spec §6.7). A tile never straddles two fetched chunks. */
 export class TileCache {
-  private tiles = new Map<string, { canvas: HTMLCanvasElement; used: number }>();
+  private tiles = new Map<string, { canvas: HTMLCanvasElement; used: number; rev: number }>();
   private tick = 0;
   scale = 1;
   readonly px: number;
@@ -119,20 +119,29 @@ export class TileCache {
     return this.world.chunks.get(this.world.chunkKey(c.i, c.j));
   }
 
-  /** The tile canvas, or null if its chunk has not loaded yet (or the render budget is spent). */
+    has(tx: number, ty: number) { return this.tiles.has(`${tx},${ty}`); }
+
+  /** True when the tile exists but its chunk has gained data (e.g. buildings arrived) since it was drawn. */
+  isStale(tx: number, ty: number) {
+    const t = this.tiles.get(`${tx},${ty}`);
+    return !!t && t.rev !== this.chunkOf(tx, ty)?.rev;
+  }
+
+  /** The tile canvas (re-rendering it first if allowed and stale), or null if its chunk has no data yet. */
   get(tx: number, ty: number, canCreate = true): HTMLCanvasElement | null {
     const key = `${tx},${ty}`;
     let t = this.tiles.get(key);
-    if (!t) {
-      const chunk = this.chunkOf(tx, ty);
-      if (!chunk || !canCreate) return null;
-      const c = document.createElement('canvas');
+    const chunk = this.chunkOf(tx, ty);
+    if (!chunk || !chunk.roadsLoaded) return t?.canvas ?? null;
+    if (!t || (canCreate && t.rev !== chunk.rev)) {
+      if (!canCreate) return null;
+      const c = t?.canvas ?? document.createElement('canvas');
       c.width = c.height = Math.ceil(this.px * this.scale);
       const ctx = c.getContext('2d')!;
-      ctx.scale(this.scale, this.scale);
+      ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
       ctx.translate(-tx * this.px, -ty * this.px);
       paintFeatures(ctx, chunk.roads, chunk.areas, { x0: tx * this.px, y0: ty * this.px, x1: (tx + 1) * this.px, y1: (ty + 1) * this.px });
-      this.tiles.set(key, (t = { canvas: c, used: 0 }));
+      this.tiles.set(key, (t = { canvas: c, used: 0, rev: chunk.rev }));
       if (this.tiles.size > this.max) this.evict();
     }
     t.used = ++this.tick;

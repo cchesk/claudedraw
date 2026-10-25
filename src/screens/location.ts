@@ -2,7 +2,8 @@ import { CHARS } from '../data/characters';
 import { createGeocoder, type Place } from '../geo/geocoder';
 import { OverpassError } from '../geo/overpass';
 import { view } from '../layout';
-import { loadMap } from '../map/pipeline';
+import { chunkFetcher, loadMap } from '../map/pipeline';
+import type { World } from '../map/world';
 import { LOW, paintFeatures } from '../map/render';
 import { state } from '../state';
 import { avatar } from '../ui/avatar';
@@ -49,9 +50,7 @@ async function drawPreview(p: Place) {
   const box = $('#preview'), canvas = $<HTMLCanvasElement>('#preview-canvas');
   box.classList.remove('has-map', 'has-pin');
   $('#preview-empty').textContent = 'Loading a preview of the real streets…';
-  try {
-    const map = await loadMap(p.lat, p.lng, { demo: state.demo, signal: ctl.signal });
-    if (ctl.signal.aborted) return;
+  const paint = (map: World) => {
     const w = box.clientWidth, h = box.clientHeight, k = view.stageScale * Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.max(1, Math.round(w * k)); canvas.height = Math.max(1, Math.round(h * k));
     const ctx = canvas.getContext('2d')!;
@@ -64,6 +63,16 @@ async function drawPreview(p: Place) {
     const half = (Math.max(w, h) / s) / 2 + 40;
     paintFeatures(ctx, chunk.roads, chunk.areas, { x0: -half, y0: -half - 200, x1: half, y1: half + 200 }, LOW);
     box.classList.add('has-map', 'has-pin');
+  };
+  try {
+    // streets first (fast), then buildings/parks are painted over them when they arrive
+    const map = await loadMap(p.lat, p.lng, { demo: state.demo, signal: ctl.signal });
+    if (ctl.signal.aborted) return;
+    paint(map);
+    try {
+      map.ingest(await chunkFetcher(map, state.demo)(0, 0, 'detail', ctl.signal), 0, 0, 'detail');
+      if (!ctl.signal.aborted) paint(map);
+    } catch { /* the street-only preview is fine */ }
   } catch (e) {
     if (ctl.signal.aborted) return;
     $('#preview-empty').textContent = `Preview unavailable right now. You can still start exploring.${e instanceof OverpassError ? ' (' + e.detail + ')' : ''}`;

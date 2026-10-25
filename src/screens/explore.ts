@@ -200,9 +200,10 @@ function draw(now = 0) {
   const T = tiles.px;
   let budget = TILE_BUDGET;
   for (let j = Math.floor(rect.y0 / T); j <= Math.floor(rect.y1 / T); j++) for (let i = Math.floor(rect.x0 / T); i <= Math.floor(rect.x1 / T); i++) {
-    const cached = tiles.get(i, j, false);
-    const c = cached ?? (budget > 0 ? tiles.get(i, j, true) : null);
-    if (!cached && c) budget--;
+    const need = !tiles.has(i, j) || tiles.isStale(i, j);
+    const fresh = need && budget > 0;
+    const c = tiles.get(i, j, fresh);
+    if (fresh && c) budget--;
     if (c) ctx.drawImage(c, i * T - 0.5, j * T - 0.5, T + 1, T + 1);
   }
   drawLabels(ctx, m.labels, rect);

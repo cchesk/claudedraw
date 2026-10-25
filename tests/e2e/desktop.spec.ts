@@ -76,11 +76,11 @@ test('desktop: the map is endless — running far loads more chunks and stays on
   await page.click('#start');
   await expect(page.locator('#s-map')).toBeVisible();
   const chunks0 = Number(await page.locator('#s-map').getAttribute('data-chunks'));
-  expect(chunks0).toBe(1);
+  expect(chunks0).toBeGreaterThanOrEqual(1);
   await page.keyboard.down('d'); await page.keyboard.down('Shift');
   await expect.poll(async () => (await worldPos(page)).x, { timeout: 30000 }).toBeGreaterThan(2500);
   await page.keyboard.up('d'); await page.keyboard.up('Shift');
-  expect(Number(await page.locator('#s-map').getAttribute('data-chunks'))).toBeGreaterThan(2);
+  expect(Number(await page.locator('#s-map').getAttribute('data-chunks'))).toBeGreaterThan(chunks0);
   await expect(page.locator('#street')).not.toHaveText('');
   await page.screenshot({ path: 'test-results/endless-map.png' });
   expect(errs).toEqual([]);

@@ -4,7 +4,7 @@ import {
   bestRun, classifyArea, classifyHighway, classifyPoi, clean, joinRings, keyOf, LABEL_CHAR_W, makeArea, OTHER_HW,
   UnionFind, type OverpassData, type Pt,
 } from './build';
-import type { Area, Chunk, Intersection, Label, Poi, Road, Segment, Vec, WayInfo } from './types';
+import type { Area, Chunk, Intersection, Label, Poi, Segment, Vec, WayInfo } from './types';
 
 interface NodeAcc extends Intersection { ways: Set<number> }
 
@@ -58,7 +58,9 @@ export class World {
     const r = this.chunkRect(i, j);
     return bboxOfRect(this.proj, r.x0, r.y0, r.x1, r.y1);
   }
-  hasChunk(i: number, j: number) { return this.chunks.has(this.chunkKey(i, j)); }
+  /** Street data loaded: the chunk is playable. */
+  hasChunk(i: number, j: number) { return !!this.chunks.get(this.chunkKey(i, j))?.roadsLoaded; }
+  hasDetail(i: number, j: number) { return !!this.chunks.get(this.chunkKey(i, j))?.detailLoaded; }
 
   /** Is this segment part of the street network the player can actually reach from the spawn area? */
   reachable = (s: Segment) => this.mainKey === null || this.uf.find(s.nk) === this.uf.find(this.mainKey);
@@ -131,8 +133,10 @@ export class World {
   }
 
   /** Add one Overpass chunk (spec §6.2/§6.4). Safe to call for neighbours as the player walks. */
-  ingest(data: OverpassData, i = 0, j = 0): Chunk {
-    const roads: Road[] = [], areas: Area[] = [];
+  ingest(data: OverpassData, i = 0, j = 0, phase: 'all' | 'roads' | 'detail' = 'all'): Chunk {
+    const key = this.chunkKey(i, j);
+    const chunk: Chunk = this.chunks.get(key) ?? { i, j, roads: [], areas: [], rev: 0, roadsLoaded: false, detailLoaded: false };
+    const { roads, areas } = chunk;
     const addArea = (a: Area | null) => {
       if (!a) return;
       areas.push(a);
@@ -177,8 +181,10 @@ export class World {
         outers.forEach((o, n) => addArea(makeArea(kind, [o.map(this.w), ...inners.map((r) => r.map(this.w))], `${ek}.${n}`)));
       }
     }
-    const chunk: Chunk = { i, j, roads, areas };
-    this.chunks.set(this.chunkKey(i, j), chunk);
+    if (phase !== 'detail') chunk.roadsLoaded = true;
+    if (phase !== 'roads') chunk.detailLoaded = true;
+    chunk.rev++;
+    this.chunks.set(key, chunk);
     if (this.mainKey === null || !this.segments.some((s) => this.uf.find(s.nk) === this.uf.find(this.mainKey!))) this.pickMain();
     this.version++;
     return chunk;

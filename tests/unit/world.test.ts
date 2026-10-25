@@ -8,7 +8,7 @@ import { World } from '../../src/map/world';
 import { loadFixture, rng } from './helpers';
 
 const demoWorld = () => { const w = new World(40, -75, 400); w.ingest(demoChunk(w.chunkBBox(0, 0)), 0, 0); return w; };
-const demoFetch = (w: World) => async (i: number, j: number) => demoChunk(w.chunkBBox(i, j));
+const demoFetch = (w: World) => async (i: number, j: number, phase: 'roads' | 'detail') => demoChunk(w.chunkBBox(i, j), phase);
 const flush = () => new Promise<void>((r) => setImmediate(r));
 
 describe('chunk grid', () => {
@@ -59,6 +59,33 @@ describe('ingesting several chunks', () => {
   });
 });
 
+describe('two-phase chunks (streets first, detail later)', () => {
+  it('streets alone make a chunk playable; detail merges in later and bumps the render revision', () => {
+    const w = new World(40, -75, 400);
+    const roads = demoChunk(w.chunkBBox(0, 0), 'roads'), detail = demoChunk(w.chunkBBox(0, 0), 'detail');
+    expect(roads.elements.some((e) => e.tags?.building)).toBe(false);
+    expect(detail.elements.some((e) => e.tags?.highway && e.tags.highway !== 'footway')).toBe(false);
+    const c = w.ingest(roads, 0, 0, 'roads');
+    expect(w.hasChunk(0, 0)).toBe(true); expect(w.hasDetail(0, 0)).toBe(false);
+    expect(c.areas.length).toBe(0);
+    const rev = c.rev;
+    w.ingest(detail, 0, 0, 'detail');
+    expect(w.hasDetail(0, 0)).toBe(true);
+    expect(c.areas.length).toBeGreaterThan(5); expect(c.rev).toBeGreaterThan(rev);
+    expect(w.pois.length).toBeGreaterThan(0); // landmarks come from the streets phase
+  });
+  it('streamer fetches missing streets before any detail, then detail nearest-first', async () => {
+    const w = new World(40, -75, 400);
+    w.ingest(demoChunk(w.chunkBBox(0, 0), 'roads'), 0, 0, 'roads');
+    const order: string[] = [];
+    const s = new Streamer(w, async (i, j, phase) => { order.push(`${i},${j},${phase}`); await flush(); return demoChunk(w.chunkBBox(i, j), phase); }, () => {}, 900, () => 0);
+    for (let n = 0; n < 12; n++) { s.update(700, 0); await flush(); await flush(); }
+    expect(order[0]).toBe('1,0,roads');            // streets of the chunk we're heading into come first
+    expect(order.indexOf('0,0,detail')).toBeGreaterThan(0);
+    expect(order.indexOf('1,0,roads')).toBeLessThan(order.indexOf('0,0,detail'));
+  });
+});
+
 describe('Streamer', () => {
   it('only asks for chunks whose edge is within the prefetch distance, nearest first', () => {
     const w = demoWorld();
@@ -71,11 +98,11 @@ describe('Streamer', () => {
   it('loads one chunk at a time and backs off after a failure', async () => {
     const w = demoWorld();
     let calls = 0, now = 0, fail = true, inflight = 0, maxInflight = 0;
-    const s = new Streamer(w, async (i, j) => {
+    const s = new Streamer(w, async (i, j, phase) => {
       calls++; inflight++; maxInflight = Math.max(maxInflight, inflight);
       await flush(); inflight--;
       if (fail) throw new Error('boom');
-      return demoChunk(w.chunkBBox(i, j));
+      return demoChunk(w.chunkBBox(i, j), phase);
     }, () => {}, 700, () => now);
     s.update(700, 0); s.update(700, 0); s.update(700, 0);
     await flush(); await flush();

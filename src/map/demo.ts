@@ -19,7 +19,14 @@ const POI_SETS: [string, Record<string, string>][] = [
   ['Little Cafe', { amenity: 'cafe' }], ['War Memorial', { historic: 'memorial' }],
 ];
 
-export function demoChunk(b: BBox): OverpassData {
+export function demoChunk(b: BBox, phase: 'all' | 'roads' | 'detail' = 'all'): OverpassData {
+  const all = demoChunkAll(b);
+  if (phase === 'all') return all;
+  const roadsPart = (e: OverpassElement) => e.type === 'node' || (e.tags?.highway !== undefined && e.tags.highway !== 'footway');
+  return { elements: all.elements.filter((e) => roadsPart(e) === (phase === 'roads')) };
+}
+
+function demoChunkAll(b: BBox): OverpassData {
   const els: OverpassElement[] = [];
   const at = (lat: number, lng: number) => ({ lat, lon: lng });
   const sig = Math.round(b.south * 1e4) * 131 + Math.round(b.west * 1e4);

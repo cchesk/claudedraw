@@ -27,6 +27,6 @@ export interface Landmark { name: string; x: number; y: number; poiX: number; po
 export interface Label { text: string; x: number; y: number; angle: number }
 
 /** Render data for one fetched chunk: every feature intersecting the chunk, in world px. */
-export interface Chunk { i: number; j: number; roads: Road[]; areas: Area[] }
+export interface Chunk { i: number; j: number; roads: Road[]; areas: Area[]; rev: number; roadsLoaded: boolean; detailLoaded: boolean }
 
 export type { World as MapModel } from './world';
