@@ -1,6 +1,7 @@
 import { CACHE_TTL_MS, OVERPASS_URLS } from '../config';
 import type { OverpassData } from '../map/build';
 import type { BBox } from './project';
+import { buildQuery } from '../../shared/overpassQuery.js';
 
 export const roundCoord = (n: number) => Math.round(n * 1e4) / 1e4;
 export type Phase = 'roads' | 'detail';
@@ -9,41 +10,7 @@ export type Phase = 'roads' | 'detail';
 export const chunkCacheKey = (lat0: number, lng0: number, half: number, i: number, j: number, phase: Phase) =>
   `${roundCoord(lat0)},${roundCoord(lng0)},${half},${i},${j},${phase}`;
 
-const FOOT = 'footway|path|cycleway|steps|bridleway|corridor|track|pedestrian_area';
-const DRIVE = 'driveway|parking_aisle|drive-through|emergency_access';
-
-/**
- * Two small queries per chunk instead of one big one (spec §6.2 lists the same features):
- *  - roads: every street the player can use (+ named POIs for landmarks). Small and fast, so the map is playable at once.
- *  - detail: buildings, parks, water, footpaths and driveways. Big, but only needed for looks, so it loads in the background.
- */
-export function buildQuery(b: BBox, phase: Phase): string {
-  const bb = `${b.south.toFixed(6)},${b.west.toFixed(6)},${b.north.toFixed(6)},${b.east.toFixed(6)}`;
-  const body = phase === 'roads' ? `
-way["highway"]["highway"!~"^(${FOOT}|proposed|construction|elevator|platform|service)$"](${bb});
-way["highway"="service"]["service"!~"^(${DRIVE})$"](${bb});
-node["name"]["amenity"](${bb});
-node["name"]["tourism"](${bb});
-node["name"]["historic"](${bb});
-node["name"]["leisure"](${bb});
-way["name"]["amenity"](${bb});
-way["name"]["tourism"](${bb});
-way["name"]["historic"](${bb});
-way["name"]["leisure"](${bb});` : `
-way["highway"~"^(${FOOT})$"](${bb});
-way["highway"="service"]["service"~"^(${DRIVE})$"](${bb});
-way["building"](${bb});
-way["leisure"~"^(park|garden|playground)$"](${bb});
-way["landuse"~"^(grass|forest)$"](${bb});
-way["natural"~"^(water|wood)$"](${bb});
-way["waterway"="riverbank"](${bb});
-relation["type"="multipolygon"]["natural"="water"](${bb});
-relation["type"="multipolygon"]["leisure"~"^(park|garden)$"](${bb});
-relation["type"="multipolygon"]["landuse"="grass"](${bb});
-relation["type"="multipolygon"]["waterway"="riverbank"](${bb});`;
-  return `[out:json][timeout:25];(${body}
-);out geom qt;`;
-}
+export { buildQuery };
 
 // ---- IndexedDB cache (7 days) ----------------------------------------------
 const DB = 'street-quest', STORE = 'overpass';

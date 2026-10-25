@@ -9,7 +9,8 @@
     "preview": "vite preview --port 4173",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "fixture": "node scripts/make-fixture.mjs"
+    "fixture": "node scripts/make-fixture.mjs",
+    "start:proxy": "node server/index.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
