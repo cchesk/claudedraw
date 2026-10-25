@@ -68,3 +68,8 @@ Configure with `VITE_API_URL` (client) and `OVERPASS_URLS` / `ALLOWED_ORIGINS` (
 ## Deploy (Render Static Site)
 
 `render.yaml` defines the site. Build `npm ci && npm run build`, publish `dist`, auto-deploy on push to `main`.
+
+## Deploy (own server on Tailscale)
+
+`.github/workflows/deploy.yml` also deploys every push to `main` to a private server on your tailnet (site + proxy).
+One-time setup: [`deploy/README.md`](deploy/README.md).
