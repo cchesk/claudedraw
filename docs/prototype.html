@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F1521">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Street Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0F1521; --panel:#161E2F; --panel-2:#1C2236; --raised:#222C42; --line:#2A3550; --track:#26314A;
+  --text:#EEF2F8; --muted:#9AA6BD; --lime:#C8F04A; --coral:#FF8A65; --sky:#6EC1FF;
+  --display:'Bricolage Grotesque',system-ui,sans-serif; --body:Inter,system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  --sat:env(safe-area-inset-top,0px); --sab:env(safe-area-inset-bottom,0px); --sal:env(safe-area-inset-left,0px); --sar:env(safe-area-inset-right,0px);
+  --g:24px; /* HUD inset */
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:#080C14;overflow:hidden;overscroll-behavior:none}
+#stage{position:fixed;left:50%;top:50%;width:1280px;height:800px;transform-origin:center;overflow:hidden;
+  font-family:var(--body);color:var(--text);background:var(--ink)}
+.screen{position:absolute;inset:0;display:none}
+.screen.active{display:flex}
+.dots{background-color:var(--ink);background-image:radial-gradient(#1E2740 1.2px,transparent 1.2px);background-size:22px 22px}
+.setup{flex-direction:column;gap:36px;padding:40px 64px 48px}
+button,input{font:inherit;color:inherit;touch-action:manipulation}
+:focus-visible{outline:3px solid var(--sky);outline-offset:3px}
+
+/* Header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.logo{display:flex;align-items:center;gap:12px;font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.04em;white-space:nowrap}
+.steps{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:13px;font-weight:500}
+.step{padding:8px 14px;border-radius:999px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.step.current{background:var(--lime);border-color:var(--lime);color:var(--ink);font-weight:700}
+.step.done{border-color:#3A4A2A;color:var(--lime)}
+.step-link{width:28px;height:2px;background:var(--line)}
+.step-link.done{background:var(--lime)}
+
+h1{margin:0;font-family:var(--display);font-weight:800;font-size:64px;line-height:1;letter-spacing:-.02em}
+.lede{margin:10px 0 0;font-size:18px;line-height:1.5;color:var(--muted)}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:12px;height:56px;padding:0 28px;border-radius:16px;border:0;
+  font-weight:600;font-size:17px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn-primary{background:var(--lime);color:var(--ink)}
+.btn-primary:hover{background:#D6FA6A}
+.btn-primary:disabled{background:var(--track);color:var(--muted);cursor:not-allowed}
+.btn-ghost{background:transparent;border:1px solid var(--line);color:var(--text);padding:0 24px}
+.btn-ghost:hover{background:var(--panel)}
+
+/* Character cards */
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;flex-grow:1}
+.card{position:relative;display:flex;flex-direction:column;gap:18px;padding:22px;border-radius:22px;border:2px solid var(--line);
+  background:var(--panel);text-align:left;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}
+@media (hover:hover){.card:hover{transform:translateY(-3px)}}
+.card[aria-pressed="true"]{background:var(--panel-2);border-color:var(--c);box-shadow:0 0 0 6px color-mix(in srgb,var(--c) 15%,transparent)}
+.badge{position:absolute;top:-14px;right:20px;padding:6px 12px;border-radius:999px;background:var(--c);color:var(--ink);
+  font-family:var(--mono);font-size:12px;font-weight:700;display:none}
+.card[aria-pressed="true"] .badge{display:block}
+.portrait{height:200px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.card-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.card-name{font-family:var(--display);font-weight:800;font-size:28px}
+.card-tag{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.stats{display:flex;flex-direction:column;gap:10px;font-size:13px;color:var(--muted)}
+.stat{display:grid;grid-template-columns:70px 1fr;align-items:center;gap:10px}
+.bar{height:8px;border-radius:4px;background:var(--track)}
+.bar>i{display:block;height:100%;border-radius:4px;background:var(--c)}
+.foot{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.hint{font-family:var(--mono);font-size:13px;color:var(--muted)}
+
+/* Location */
+.loc-body{display:flex;gap:48px;flex-grow:1;min-height:0}
+.loc-left{width:520px;display:flex;flex-direction:column;gap:24px}
+.label{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.06em}
+.field{display:flex;align-items:center;gap:12px;height:64px;padding:0 10px 0 18px;margin-top:8px;border-radius:16px;
+  background:var(--panel);border:2px solid var(--line)}
+.field:focus-within{border-color:var(--lime);box-shadow:0 0 0 6px rgba(200,240,74,.12)}
+.field input{flex-grow:1;min-width:0;border:0;outline:none;background:transparent;font-size:19px}
+.field input::placeholder{color:#6F7B94}
+.icon-btn{flex:none;width:44px;height:44px;border:0;border-radius:12px;background:var(--raised);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.suggest{display:flex;flex-direction:column;border-radius:16px;background:var(--panel);border:1px solid var(--line);overflow:hidden}
+.opt{display:flex;align-items:center;gap:14px;min-height:56px;padding:10px 18px;border:0;border-top:1px solid var(--raised);background:transparent;text-align:left;cursor:pointer}
+.opt:first-child{border-top:0}
+.opt:hover,.opt[aria-selected="true"]{background:#1E2840}
+.opt small{display:block;font-size:13px;color:var(--muted)}
+.opt b{font-weight:600}
+.opt.geo{color:var(--sky);font-weight:600}
+.loc-actions{display:flex;gap:12px;margin-top:auto}
+.preview{position:relative;flex-grow:1;border-radius:24px;overflow:hidden;border:1px solid var(--line);background:#172033}
+.preview svg{width:100%;height:100%;display:block}
+.preview-card{position:absolute;left:20px;right:20px;bottom:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:16px 20px;border-radius:16px;background:rgba(15,21,33,.92);border:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em}
+
+/* ---------- Map ---------- */
+#s-map{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+#viewport{position:absolute;inset:0;overflow:hidden;background:#141B2B}
+#world{position:absolute;left:0;top:0;width:1280px;height:800px;transform-origin:0 0;will-change:transform}
+#world>svg{position:absolute;left:0;top:0}
+#player{position:absolute;left:0;top:0;width:96px;height:96px;will-change:transform}
+#player .ring{position:absolute;inset:2px;border-radius:50%;background:color-mix(in srgb,var(--c) 12%,transparent);border:2px dashed color-mix(in srgb,var(--c) 70%,transparent)}
+#player .arrow{position:absolute;inset:0;transition:transform .12s}
+#player .arrow::before{content:"";position:absolute;left:50%;top:-12px;margin-left:-9px;border:9px solid transparent;border-bottom:12px solid var(--c);border-top:0}
+#player .avatar{position:absolute;left:24px;top:14px}
+#player.walking .avatar{animation:bob .32s infinite alternate ease-in-out}
+#player.blocked .ring{border-color:#FF5D5D}
+@keyframes bob{to{transform:translateY(-4px)}}
+.landmark{transition:opacity .3s}
+.landmark.got{opacity:0}
+
+.hud{position:absolute;background:rgba(15,21,33,.92);border:1px solid var(--line);border-radius:18px;z-index:3}
+.hud-char{left:calc(var(--g) + var(--sal));top:calc(var(--g) + var(--sat));display:flex;align-items:center;gap:14px;padding:12px 18px 12px 12px}
+.hud-char .portrait-sm{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center}
+.hud-char .nm{font-family:var(--display);font-weight:800;font-size:18px;line-height:1}
+.hud-char .bar{width:120px;height:6px}
+.hud-char .bar-label{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.hud-street{left:50%;top:calc(var(--g) + var(--sat));transform:translateX(-50%);border-radius:999px;display:flex;align-items:center;gap:10px;padding:12px 20px;font-size:15px;font-weight:600;white-space:nowrap}
+.hud-tr{position:absolute;right:calc(var(--g) + var(--sar));top:calc(var(--g) + var(--sat));display:flex;gap:12px;align-items:flex-start;z-index:3}
+.hud-pause{position:static;width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.hud-mini{position:relative;width:176px;height:176px;border-radius:20px;overflow:hidden}
+.hud-mini svg{width:100%;height:100%;display:block}
+.hud-mini .n{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:11px;font-weight:700}
+.hud-quest{left:calc(var(--g) + var(--sal));bottom:calc(var(--g) + var(--sab));width:300px;display:flex;flex-direction:column;gap:12px;padding:18px 20px}
+.hud-quest .qt{font-family:var(--display);font-weight:600;font-size:20px}
+.hud-quest .qbars{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.hud-keys{right:calc(var(--g) + var(--sar));bottom:calc(var(--g) + var(--sab));display:flex;align-items:flex-end;gap:16px;padding:18px 20px}
+.keys{display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:48px 48px;gap:6px}
+kbd{display:flex;align-items:center;justify-content:center;border-radius:10px;background:var(--raised);color:var(--text);
+  box-shadow:inset 0 -4px 0 var(--ink);font-family:var(--mono);font-weight:700;font-size:17px;transition:transform .05s}
+kbd.on{background:var(--coral);color:var(--ink);box-shadow:inset 0 -2px 0 rgba(0,0,0,.25);transform:translateY(2px)}
+
+/* Touch controls */
+.touch-only{display:none!important}
+body.touch .touch-only{display:flex!important}
+body.touch .desktop-only{display:none!important}
+#stick-zone{position:absolute;left:0;bottom:0;width:55%;height:65%;z-index:2}
+#stick{position:absolute;width:136px;height:136px;margin:-68px 0 0 -68px;border-radius:50%;
+  background:rgba(15,21,33,.55);border:2px solid rgba(238,242,248,.18);pointer-events:none;z-index:2;transition:opacity .15s}
+#stick.idle{opacity:.55}
+#knob{position:absolute;left:50%;top:50%;width:60px;height:60px;margin:-30px 0 0 -30px;border-radius:50%;
+  background:var(--c,var(--coral));box-shadow:0 4px 0 rgba(0,0,0,.3);will-change:transform}
+#run{position:absolute;right:calc(28px + var(--sar));bottom:calc(36px + var(--sab));width:84px;height:84px;border-radius:50%;
+  border:2px solid rgba(238,242,248,.2);background:rgba(15,21,33,.75);color:var(--text);
+  font-family:var(--mono);font-weight:700;font-size:14px;letter-spacing:.06em;align-items:center;justify-content:center;flex-direction:column;gap:2px;z-index:3}
+#run.on{background:var(--coral);color:var(--ink);border-color:var(--coral)}
+#run small{font-size:9px;opacity:.8}
+body.touch .hud-quest{bottom:auto;top:calc(var(--g) + var(--sat) + 88px)}
+
+.toast{position:absolute;left:50%;top:calc(92px + var(--sat));transform:translate(-50%,-10px);padding:12px 20px;border-radius:999px;background:var(--lime);color:var(--ink);
+  font-weight:600;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;z-index:5;white-space:nowrap}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.overlay{position:absolute;inset:0;background:rgba(8,12,20,.72);display:none;align-items:center;justify-content:center;z-index:10;padding:16px}
+.overlay.show{display:flex}
+.modal{width:420px;max-width:100%;padding:32px;border-radius:24px;background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.modal h2{margin:0 0 8px;font-family:var(--display);font-weight:800;font-size:36px}
+.rotate-hint{font-size:14px;color:var(--muted);margin:0}
+
+/* ---------- Fluid (phone / small window) layout ---------- */
+body.fluid #stage{position:fixed;inset:0;left:0;top:0;width:auto;height:auto;transform:none}
+body.fluid{--g:12px}
+body.fluid .setup{gap:20px;padding:calc(16px + var(--sat)) calc(16px + var(--sar)) calc(16px + var(--sab)) calc(16px + var(--sal));overflow-y:auto;-webkit-overflow-scrolling:touch}
+body.fluid .logo{font-size:17px;gap:10px}
+body.fluid .logo svg{width:28px;height:28px}
+body.fluid .steps{gap:6px;font-size:12px}
+body.fluid .step{padding:6px 10px}
+body.fluid .step .long{display:none}
+body.fluid .step-link{width:12px}
+body.fluid h1{font-size:40px}
+body.fluid .lede{font-size:16px;margin-top:8px}
+body.fluid .cards{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:14px;margin:0 -16px;padding:16px 16px 6px;flex:none;scrollbar-width:none}
+body.fluid .cards::-webkit-scrollbar{display:none}
+body.fluid .card{flex:0 0 min(78%,320px);scroll-snap-align:center;padding:18px;gap:14px}
+body.fluid .portrait{height:150px}
+body.fluid .card-name{font-size:24px}
+body.fluid .hint{display:none}
+body.fluid .foot{margin-top:auto;position:sticky;bottom:0}
+body.fluid .foot .btn{width:100%}
+body.fluid .loc-body{flex-direction:column;gap:18px;flex:none}
+body.fluid .loc-left{display:contents}
+body.fluid .preview{order:4;flex:0 0 210px}
+body.fluid .loc-actions{order:5;margin-top:0}
+body.fluid .loc-actions .btn-primary{flex:1}
+body.fluid .preview-card{left:12px;right:12px;bottom:12px;padding:12px 14px}
+@media (max-height:520px){
+  body.fluid .portrait{height:96px} body.fluid h1{font-size:32px}
+  body.fluid .hud-street, body.fluid:not(.touch) .hud-street{bottom:auto;top:calc(var(--g) + var(--sat))}
+  body.fluid .toast{top:calc(var(--sat) + 64px)}
+}
+
+/* fluid HUD */
+body.fluid .hud{border-radius:14px}
+body.fluid .hud-char{padding:8px 12px 8px 8px;gap:10px}
+body.fluid .hud-char .portrait-sm{width:40px;height:40px;border-radius:10px}
+body.fluid .hud-char .nm{font-size:15px}
+body.fluid .hud-char .bar{width:76px}
+body.fluid .hud-char .bar-label{display:none}
+body.fluid .hud-tr{gap:8px}
+body.fluid .hud-pause{width:44px;height:44px;border-radius:12px}
+body.fluid .hud-mini{width:104px;height:104px;border-radius:14px}
+body.fluid .hud-quest{top:calc(var(--g) + var(--sat) + 66px);width:210px;padding:10px 12px;gap:6px}
+body.fluid .hud-quest .qt{font-size:14px}
+body.fluid .hud-quest .eyebrow{font-size:10px}
+body.fluid .hud-street{top:auto;bottom:calc(var(--sab) + 184px);font-size:13px;padding:8px 14px}
+body.fluid:not(.touch) .hud-street{bottom:calc(var(--sab) + 24px)}
+body.fluid .hud-keys{display:none}
+body.fluid .toast{top:calc(var(--sat) + 132px);font-size:14px}
+body.fluid .modal{padding:24px}
+body.fluid .modal h2{font-size:30px}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body class="fluid">
+<div id="stage">
+
+<!-- ============ SCREEN 1: CHARACTER ============ -->
+<section id="s-character" class="screen setup dots active" aria-label="Pick your character">
+  <header class="top">
+    <div class="logo"><svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect x="2" y="2" width="32" height="32" rx="9" fill="#C8F04A"/><path d="M10 24 L18 10 L26 24 Z" fill="#0F1521"/></svg>STREET QUEST</div>
+    <nav class="steps" aria-label="Setup steps">
+      <span class="step current" aria-current="step">01<span class="long"> CHARACTER</span></span><span class="step-link"></span>
+      <span class="step">02<span class="long"> LOCATION</span></span><span class="step-link"></span>
+      <span class="step">03<span class="long"> EXPLORE</span></span>
+    </nav>
+  </header>
+  <div>
+    <h1>Pick your character</h1>
+    <p class="lede">Each explorer moves through the city a little differently.</p>
+  </div>
+  <div class="cards" id="cards" role="group" aria-label="Characters"></div>
+  <footer class="foot">
+    <span class="hint desktop-only">← → to browse · ENTER to choose</span>
+    <button class="btn btn-primary" id="to-location">Continue as <span id="cta-name">Courier</span>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg></button>
+  </footer>
+</section>
+
+<!-- ============ SCREEN 2: LOCATION ============ -->
+<section id="s-location" class="screen setup dots" aria-label="Pick location">
+  <header class="top">
+    <div class="logo"><svg width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect x="2" y="2" width="32" height="32" rx="9" fill="#C8F04A"/><path d="M10 24 L18 10 L26 24 Z" fill="#0F1521"/></svg>STREET QUEST</div>
+    <nav class="steps" aria-label="Setup steps">
+      <span class="step done">✓<span class="long"> CHARACTER</span></span><span class="step-link done"></span>
+      <span class="step current" aria-current="step">02<span class="long"> LOCATION</span></span><span class="step-link"></span>
+      <span class="step">03<span class="long"> EXPLORE</span></span>
+    </nav>
+  </header>
+  <div class="loc-body">
+    <div class="loc-left">
+      <div>
+        <h1>Pick location</h1>
+        <p class="lede">Your quest starts on a real street. Type any address to drop in.</p>
+      </div>
+      <div>
+        <label for="addr" class="label">ADDRESS</label>
+        <div class="field">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#C8F04A" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          <input id="addr" type="text" value="221 Maple Street" placeholder="Street, city or landmark" autocomplete="street-address" enterkeyhint="go" aria-controls="suggest">
+          <button class="icon-btn" id="clear" aria-label="Clear address"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+        </div>
+      </div>
+      <div class="suggest" id="suggest" role="listbox" aria-label="Suggestions"></div>
+      <div class="loc-actions">
+        <button class="btn btn-ghost" id="back">Back</button>
+        <button class="btn btn-primary" id="start">Start exploring
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10h12M11 5l5 5-5 5"/></svg></button>
+      </div>
+    </div>
+    <div class="preview">
+      <svg viewBox="0 0 580 580" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <rect width="580" height="580" fill="#172033"/>
+        <g fill="#1F2A42"><rect x="40" y="40" width="150" height="110" rx="8"/><rect x="250" y="40" width="120" height="110" rx="8"/><rect x="430" y="40" width="130" height="110" rx="8"/>
+        <rect x="250" y="210" width="120" height="140" rx="8"/><rect x="430" y="210" width="130" height="140" rx="8"/><rect x="40" y="410" width="150" height="150" rx="8"/><rect x="250" y="410" width="120" height="150" rx="8"/></g>
+        <rect x="430" y="410" width="130" height="150" rx="8" fill="#1A2E4A"/>
+        <rect x="40" y="210" width="150" height="140" rx="8" fill="#1C3A2E"/>
+        <g fill="#245040"><circle cx="80" cy="250" r="14"/><circle cx="130" cy="300" r="18"/><circle cx="160" cy="245" r="11"/></g>
+        <path d="M0 180H580M0 380H580M220 0V580M400 0V580" stroke="#2E3A56" stroke-width="40"/>
+        <path d="M0 180H580M0 380H580M220 0V580M400 0V580" stroke="#44527A" stroke-width="2" stroke-dasharray="12 10"/>
+        <circle cx="310" cy="180" r="60" fill="rgba(255,138,101,0.12)"/><circle cx="310" cy="180" r="30" fill="rgba(255,138,101,0.2)"/>
+        <path d="M310 168 c-14 0 -22 -10 -22 -22 a22 22 0 0144 0 c0 12 -8 22 -22 22z" fill="#FF8A65"/><circle cx="310" cy="146" r="7" fill="#0F1521"/>
+      </svg>
+      <div class="preview-card">
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+          <span class="eyebrow" style="color:var(--coral)">STARTING POINT</span>
+          <span id="preview-addr" style="font-weight:600;font-size:17px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">221 Maple Street</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px"><span id="preview-avatar"></span><span id="preview-name" style="font-size:14px;color:var(--muted)">Courier</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SCREEN 3: MAP ============ -->
+<section id="s-map" class="screen" aria-label="Explore">
+  <div id="viewport">
+    <div id="world">
+      <svg width="1280" height="800" viewBox="0 0 1280 800" aria-hidden="true">
+        <rect width="1280" height="800" fill="#172033"/>
+        <g fill="#1F2A42">
+          <rect x="30" y="30" width="160" height="100" rx="10"/><rect x="250" y="30" width="240" height="100" rx="10"/><rect x="550" y="30" width="240" height="100" rx="10"/>
+          <rect x="850" y="30" width="220" height="100" rx="10"/><rect x="1130" y="30" width="140" height="100" rx="10"/><rect x="30" y="190" width="160" height="220" rx="10"/>
+          <rect x="250" y="190" width="110" height="100" rx="10"/><rect x="250" y="310" width="110" height="100" rx="10"/><rect x="850" y="190" width="220" height="220" rx="10"/>
+          <rect x="1130" y="190" width="140" height="220" rx="10"/><rect x="30" y="470" width="160" height="200" rx="10"/><rect x="250" y="470" width="240" height="90" rx="10"/>
+          <rect x="550" y="470" width="240" height="200" rx="10"/><rect x="1130" y="470" width="140" height="200" rx="10"/><rect x="30" y="730" width="1240" height="80" rx="10"/>
+        </g>
+        <g fill="#22304B"><rect x="380" y="190" width="110" height="220" rx="10"/><rect x="250" y="580" width="240" height="90" rx="10"/></g>
+        <rect x="850" y="470" width="220" height="200" rx="10" fill="#1A2E4A"/>
+        <rect x="550" y="190" width="240" height="220" rx="10" fill="#1C3A2E"/>
+        <g fill="#245040"><circle cx="600" cy="240" r="22"/><circle cx="680" cy="300" r="30"/><circle cx="750" cy="230" r="18"/><circle cx="610" cy="360" r="20"/><circle cx="740" cy="370" r="16"/></g>
+        <path d="M560 330 Q 640 280 780 320" stroke="#2D5C49" stroke-width="6" fill="none" stroke-linecap="round"/>
+        <path d="M0 160H1280M0 440H1280M0 700H1280M220 0V800M520 0V800M820 0V800M1100 0V800" stroke="#2E3A56" stroke-width="56"/>
+        <path d="M0 160H1280M0 440H1280M0 700H1280M220 0V800M520 0V800M820 0V800M1100 0V800" stroke="#44527A" stroke-width="2" stroke-dasharray="16 12"/>
+        <g fill="#EEF2F8" opacity=".5"><rect x="492" y="420" width="6" height="40"/><rect x="504" y="420" width="6" height="40"/><rect x="530" y="420" width="6" height="40"/><rect x="542" y="420" width="6" height="40"/></g>
+        <g font-family="JetBrains Mono, monospace" font-size="12" font-weight="500" fill="#8592AE" letter-spacing="1.5">
+          <text x="580" y="436">MAPLE ST</text><text x="250" y="156">OAK ST</text><text x="880" y="696">ELM ST</text>
+          <text x="216" y="640" transform="rotate(-90 216 640)">2ND AVE</text><text x="516" y="640" transform="rotate(-90 516 640)">3RD AVE</text>
+          <text x="816" y="130" transform="rotate(-90 816 130)">4TH AVE</text><text x="1096" y="640" transform="rotate(-90 1096 640)">5TH AVE</text>
+        </g>
+        <g id="landmarks"></g>
+      </svg>
+      <div id="player"><div class="ring"></div><div class="arrow"></div><div class="avatar"></div></div>
+    </div>
+  </div>
+
+  <!-- Touch controls -->
+  <div id="stick-zone" class="touch-only" aria-hidden="true"></div>
+  <div id="stick" class="touch-only idle" aria-hidden="true"><div id="knob"></div></div>
+  <button id="run" class="touch-only" aria-label="Run (hold)">RUN<small>HOLD</small></button>
+
+  <div class="hud hud-char">
+    <div id="hud-portrait" class="portrait-sm"></div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <span id="hud-name" class="nm">Courier</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="bar" role="meter" aria-label="Stamina" aria-valuemin="0" aria-valuemax="100" id="stamina-meter"><i id="stamina" style="width:100%"></i></div>
+        <span class="bar-label">STAMINA</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="hud hud-street" aria-live="polite">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF8A65" stroke-width="2.2" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0114 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>
+    <span id="street">Maple St &amp; 3rd Ave</span>
+  </div>
+
+  <div class="hud-tr">
+    <button class="hud hud-pause" id="pause" aria-label="Pause">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3" y="2" width="4" height="14" rx="1.5" fill="currentColor"/><rect x="11" y="2" width="4" height="14" rx="1.5" fill="currentColor"/></svg></button>
+    <div class="hud hud-mini" style="position:relative">
+      <svg viewBox="0 0 176 176" role="img" aria-label="Minimap">
+        <path d="M0 35H176M0 96H176M0 154H176M30 0V176M71 0V176M113 0V176M151 0V176" stroke="#2E3A56" stroke-width="8"/>
+        <rect x="76" y="42" width="33" height="48" rx="3" fill="#1C3A2E"/>
+        <rect id="mini-view" fill="none" stroke="#9AA6BD" stroke-width="1.5" rx="4" style="display:none"/>
+        <g id="mini-landmarks"></g>
+        <circle id="mini-player" r="6" fill="#FF8A65" stroke="#0F1521" stroke-width="2"/>
+      </svg>
+      <span class="n">N</span>
+    </div>
+  </div>
+
+  <div class="hud hud-quest">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span class="eyebrow" style="color:var(--lime)">CURRENT QUEST</span>
+      <span id="quest-count" style="font-family:var(--mono);font-size:12px;color:var(--muted)">0 / 3</span>
+    </div>
+    <span id="quest-title" class="qt">Find 3 landmarks nearby</span>
+    <div id="quest-bars" class="qbars"></div>
+  </div>
+
+  <div class="hud hud-keys desktop-only">
+    <div style="display:flex;flex-direction:column;gap:4px;padding-bottom:6px">
+      <span class="eyebrow" style="color:var(--muted)">MOVE</span>
+      <span style="font-size:13px;color:var(--muted)">Streets only · SHIFT runs</span>
+    </div>
+    <div class="keys" aria-hidden="true"><span></span><kbd data-k="w">W</kbd><span></span><kbd data-k="a">A</kbd><kbd data-k="s">S</kbd><kbd data-k="d">D</kbd></div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <div class="overlay" id="paused" role="dialog" aria-modal="true" aria-labelledby="paused-title">
+    <div class="modal">
+      <h2 id="paused-title">Paused</h2>
+      <p class="rotate-hint touch-only">Drag on the left side to move. Hold RUN to sprint. You can only walk on streets.</p>
+      <button class="btn btn-primary" id="resume">Resume</button>
+      <button class="btn btn-ghost" id="change-loc">Change location</button>
+      <button class="btn btn-ghost" id="change-char">Change character</button>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<script>
+(() => {
+  // ---------- Data ----------
+  const CHARS = {
+    scout:   { name:'Scout',   tag:'FAST · LIGHT',      color:'#C8F04A', tile:'#1D2840', body:'down',  stats:{Speed:90, Stamina:45, Luck:60} },
+    courier: { name:'Courier', tag:'STEADY · BALANCED', color:'#FF8A65', tile:'#2A2638', body:'up',    stats:{Speed:65, Stamina:70, Luck:65} },
+    tinker:  { name:'Tinker',  tag:'TOUGH · LUCKY',     color:'#6EC1FF', tile:'#1B2A3E', body:'round', stats:{Speed:40, Stamina:90, Luck:85} },
+  };
+  const ORDER = ['scout','courier','tinker'];
+  const WORLD = { w:1280, h:800 };
+  // STREETS-ONLY RULE: the walkable area is exactly the union of these road bands.
+  const ROADS_H = [{y:160,name:'Oak St'},{y:440,name:'Maple St'},{y:700,name:'Elm St'}];
+  const ROADS_V = [{x:220,name:'2nd Ave'},{x:520,name:'3rd Ave'},{x:820,name:'4th Ave'},{x:1100,name:'5th Ave'}];
+  const HALF = 24;        // walkable half-width (road drawn at 28) — keeps the body visually on the asphalt
+  const EDGE = 20;        // keep inside the world edge
+  const ASSIST = 40;      // corner assist radius: snaps toward a cross street when turning
+  const DEAD = 0.15;      // joystick dead zone
+  const STICK_R = 52;     // joystick travel radius (px)
+  const LANDMARKS = [
+    { name:'Clock Tower',  x:1100, y:300, color:'#C8F04A' },
+    { name:'Old Fountain', x:220,  y:590, color:'#6EC1FF' },
+    { name:'Corner Diner', x:960,  y:700, color:'#C8F04A' },
+  ];
+  const START = { x:660, y:440 };
+
+  const state = { char:'courier', address:'221 Maple Street', x:START.x, y:START.y, stamina:100,
+                  found:new Set(), keys:new Set(), paused:false, screen:'character',
+                  stick:{active:false, id:null, ox:0, oy:0, dx:0, dy:0}, runBtn:false };
+
+  const $ = s => document.querySelector(s);
+  const stage = $('#stage'), body = document.body;
+
+  // ---------- Helpers ----------
+  function avatar(id, w) {
+    const c = CHARS[id], h = Math.round(w * 140 / 120);
+    const head = id === 'tinker' ? 40 : 38;
+    const shape = { down:'<path d="M26 68 H94 L60 124 Z"/>', up:'<path d="M60 64 L96 124 H24 Z"/>', round:'<circle cx="60" cy="94" r="30"/>' }[c.body];
+    return `<svg width="${w}" height="${h}" viewBox="0 0 120 140" role="img" aria-label="${c.name}"><g fill="${c.color}"><circle cx="60" cy="${head}" r="20"/>${shape}</g>`+
+           `<circle cx="53" cy="${head-2}" r="3" fill="#0F1521"/><circle cx="67" cy="${head-2}" r="3" fill="#0F1521"/></svg>`;
+  }
+
+  // Touch detection: coarse pointer, or the first real touch.
+  const setTouch = on => body.classList.toggle('touch', on);
+  setTouch(matchMedia('(pointer: coarse)').matches);
+  addEventListener('touchstart', () => setTouch(true), { passive:true, once:true });
+
+  // Layout: fixed 1280×800 scaled stage on big screens, fluid full-screen layout on phones/small windows.
+  let view = { w:1280, h:800, s:1 };
+  function fit() {
+    const fixed = innerWidth >= 900 && innerHeight >= 600;
+    body.classList.toggle('fluid', !fixed);
+    stage.style.transform = fixed ? `translate(-50%,-50%) scale(${Math.min(innerWidth/1280, innerHeight/800)})` : '';
+    const vp = $('#viewport');
+    view.w = vp.clientWidth || 1280; view.h = vp.clientHeight || 800;
+    const fitS = Math.min(view.w / WORLD.w, view.h / WORLD.h);
+    // Too small to read? Zoom in (≥0.85, enough to fill the screen) and follow the player.
+    view.s = fitS >= 0.75 ? fitS : Math.min(1.2, Math.max(0.85, view.w / WORLD.w, view.h / WORLD.h));
+    if (state.screen === 'map') render();
+  }
+  addEventListener('resize', fit);
+  addEventListener('orientationchange', () => setTimeout(fit, 250));
+
+  function show(name) {
+    state.screen = name;
+    document.querySelectorAll('.screen').forEach(el => el.classList.toggle('active', el.id === 's-' + name));
+    clearInput();
+    if (name === 'location') { syncPreview(); if (!body.classList.contains('touch')) $('#addr').focus(); }
+    if (name === 'map') { fit(); enterMap(); }
+  }
+
+  // ---------- Screen 1 ----------
+  const cardsEl = $('#cards');
+  cardsEl.innerHTML = ORDER.map(id => {
+    const c = CHARS[id];
+    const stats = Object.entries(c.stats).map(([k,v]) => `<div class="stat"><span>${k}</span><div class="bar" role="meter" aria-label="${k}" aria-valuenow="${v}" aria-valuemin="0" aria-valuemax="100"><i style="width:${v}%"></i></div></div>`).join('');
+    return `<button class="card" data-id="${id}" aria-pressed="false" style="--c:${c.color}">
+      <span class="badge">SELECTED</span>
+      <div class="portrait" style="background:${c.tile}">${avatar(id,120)}</div>
+      <div class="card-head"><span class="card-name">${c.name}</span><span class="card-tag">${c.tag}</span></div>
+      <div class="stats">${stats}</div></button>`;
+  }).join('');
+  function selectChar(id, scroll) {
+    state.char = id;
+    cardsEl.querySelectorAll('.card').forEach(b => {
+      b.setAttribute('aria-pressed', b.dataset.id === id);
+      if (scroll && b.dataset.id === id && body.classList.contains('fluid')) b.scrollIntoView({ behavior:'smooth', inline:'center', block:'nearest' });
+    });
+    $('#cta-name').textContent = CHARS[id].name;
+  }
+  cardsEl.addEventListener('click', e => { const b = e.target.closest('.card'); if (b) selectChar(b.dataset.id, true); });
+  selectChar(state.char);
+  $('#to-location').onclick = () => show('location');
+
+  // ---------- Screen 2 ----------
+  const addr = $('#addr'), sug = $('#suggest'), startBtn = $('#start');
+  function renderSuggest() {
+    const v = addr.value.trim();
+    const pin = c => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-12a7 7 0 0114 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>`;
+    // Placeholder suggestions; replace with a geocoding/autocomplete API (see spec §7).
+    const alt = /street/i.test(v) ? v.replace(/street/i,'Avenue') : v + ' Avenue';
+    const items = v ? [v, alt] : [];
+    const esc = t => t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+    sug.innerHTML = items.map((t,i) => `<button class="opt" role="option" aria-selected="${i===0}" data-v="${esc(t)}">${pin(i===0?'#FF8A65':'#9AA6BD')}<span><b>${esc(t)}</b><small>[City, State]</small></span></button>`).join('') +
+      `<button class="opt geo" data-geo="1"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>Use my current location</button>`;
+    state.address = v;
+    startBtn.disabled = !v;
+    syncPreview();
+  }
+  function syncPreview() {
+    $('#preview-addr').textContent = state.address || 'No address yet';
+    $('#preview-name').textContent = CHARS[state.char].name;
+    $('#preview-avatar').innerHTML = avatar(state.char, 40);
+  }
+  addr.addEventListener('input', renderSuggest);
+  addr.addEventListener('keydown', e => { if (e.key === 'Enter' && !startBtn.disabled) { addr.blur(); show('map'); } });
+  $('#clear').onclick = () => { addr.value = ''; renderSuggest(); addr.focus(); };
+  sug.addEventListener('click', e => {
+    const b = e.target.closest('.opt'); if (!b) return;
+    if (b.dataset.geo) {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(p => { addr.value = `${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`; renderSuggest(); }, () => {});
+      return;
+    }
+    addr.value = b.dataset.v; renderSuggest();
+  });
+  $('#back').onclick = () => show('character');
+  startBtn.onclick = () => show('map');
+  renderSuggest();
+
+  // ---------- Screen 3 ----------
+  const world = $('#world'), player = $('#player'), arrow = player.querySelector('.arrow');
+  $('#landmarks').innerHTML = LANDMARKS.map((l,i) => `<g class="landmark" id="lm${i}">
+    <circle cx="${l.x}" cy="${l.y}" r="26" fill="${l.color}" opacity=".14"/>
+    <circle cx="${l.x}" cy="${l.y}" r="14" fill="#0F1521" stroke="${l.color}" stroke-width="3"/>
+    <path transform="translate(${l.x} ${l.y-8})" d="M0 0 l2.5 5 5.5 .8 -4 3.9 .9 5.5 -4.9 -2.6 -4.9 2.6 .9 -5.5 -4 -3.9 5.5 -.8z" fill="${l.color}"/></g>`).join('');
+  const mini = (x,y) => [x * 176/WORLD.w, y * 176/WORLD.h];
+  $('#mini-landmarks').innerHTML = LANDMARKS.map((l,i) => { const [mx,my] = mini(l.x,l.y); return `<circle id="mlm${i}" cx="${mx}" cy="${my}" r="4" fill="${l.color}"/>`; }).join('');
+
+  function enterMap() {
+    const c = CHARS[state.char];
+    player.style.setProperty('--c', c.color);
+    $('#knob').style.setProperty('--c', c.color);
+    player.querySelector('.avatar').innerHTML = avatar(state.char, 48);
+    $('#hud-portrait').style.background = c.tile;
+    $('#hud-portrait').innerHTML = avatar(state.char, 32);
+    $('#hud-name').textContent = c.name;
+    $('#stamina').style.background = c.color;
+    $('#mini-player').setAttribute('fill', c.color);
+    resetStick();
+    updateQuest(); render();
+  }
+  function resetRun() {
+    state.x = START.x; state.y = START.y; state.stamina = 100; state.found.clear();
+    LANDMARKS.forEach((_,i) => { $('#lm'+i).classList.remove('got'); $('#mlm'+i).style.display = ''; });
+  }
+
+  // Streets-only collision: a point is walkable only if it lies inside a road band.
+  const onRoad = (x,y) =>
+    (x >= EDGE && x <= WORLD.w - EDGE && ROADS_H.some(r => Math.abs(y - r.y) <= HALF)) ||
+    (y >= EDGE && y <= WORLD.h - EDGE && ROADS_V.some(r => Math.abs(x - r.x) <= HALF));
+
+  function streetName() {
+    const h = ROADS_H.find(r => Math.abs(state.y - r.y) <= HALF);
+    const v = ROADS_V.find(r => Math.abs(state.x - r.x) <= HALF);
+    return h && v ? `${h.name} & ${v.name}` : (h || v).name;
+  }
+
+  function updateQuest() {
+    const n = state.found.size;
+    $('#quest-count').textContent = `${n} / ${LANDMARKS.length}`;
+    $('#quest-title').textContent = n === LANDMARKS.length ? 'Quest complete!' : `Find ${LANDMARKS.length} landmarks nearby`;
+    $('#quest-bars').innerHTML = LANDMARKS.map((_,i) => `<div style="height:6px;border-radius:3px;background:${i < n ? 'var(--lime)' : 'var(--track)'}"></div>`).join('');
+  }
+  let toastT;
+  function toast(msg) {
+    const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  // Camera: centre on the player when the world is bigger than the screen, clamp to edges.
+  function camera() {
+    const s = view.s, ww = WORLD.w * s, wh = WORLD.h * s;
+    const tx = ww <= view.w ? (view.w - ww) / 2 : Math.min(0, Math.max(view.w - ww, view.w / 2 - state.x * s));
+    const ty = wh <= view.h ? (view.h - wh) / 2 : Math.min(0, Math.max(view.h - wh, view.h / 2 - state.y * s));
+    world.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+    const mv = $('#mini-view');
+    if (ww > view.w || wh > view.h) {
+      const x0 = Math.max(0, -tx / s), y0 = Math.max(0, -ty / s);
+      const [mx,my] = mini(x0, y0), [mw,mh] = mini(Math.min(WORLD.w, view.w / s), Math.min(WORLD.h, view.h / s));
+      mv.setAttribute('x', mx); mv.setAttribute('y', my); mv.setAttribute('width', mw); mv.setAttribute('height', mh);
+      mv.style.display = '';
+    } else mv.style.display = 'none';
+  }
+
+  let lastStreet = '';
+  function render() {
+    player.style.transform = `translate(${state.x - 48}px, ${state.y - 48}px)`;
+    camera();
+    const [mx,my] = mini(state.x, state.y);
+    const mp = $('#mini-player'); mp.setAttribute('cx', mx); mp.setAttribute('cy', my);
+    $('#stamina').style.width = state.stamina + '%';
+    $('#stamina-meter').setAttribute('aria-valuenow', Math.round(state.stamina));
+    const s = streetName(); if (s !== lastStreet) { $('#street').textContent = s; lastStreet = s; }
+  }
+
+  // ---------- Input: keyboard ----------
+  const KEYMAP = { w:'w', arrowup:'w', a:'a', arrowleft:'a', s:'s', arrowdown:'s', d:'d', arrowright:'d' };
+  function updateKeys() { document.querySelectorAll('kbd[data-k]').forEach(k => k.classList.toggle('on', state.keys.has(k.dataset.k))); }
+  function clearInput() { state.keys.clear(); updateKeys(); resetStick(); setRun(false); }
+
+  addEventListener('keydown', e => {
+    const k = e.key.toLowerCase();
+    if (state.screen === 'character') {
+      const i = ORDER.indexOf(state.char);
+      if (k === 'arrowright') { selectChar(ORDER[(i+1)%3], true); e.preventDefault(); }
+      if (k === 'arrowleft')  { selectChar(ORDER[(i+2)%3], true); e.preventDefault(); }
+      if (k === 'enter' && !e.target.closest('button')) show('location');
+      return;
+    }
+    if (state.screen !== 'map') return;
+    if (k === 'escape' || k === 'p') { setPaused(!state.paused); return; }
+    if (state.paused) return;
+    if (KEYMAP[k]) { state.keys.add(KEYMAP[k]); e.preventDefault(); updateKeys(); }
+    if (k === 'shift') state.keys.add('shift');
+  });
+  addEventListener('keyup', e => {
+    const k = e.key.toLowerCase();
+    if (KEYMAP[k]) state.keys.delete(KEYMAP[k]);
+    if (k === 'shift') state.keys.delete('shift');
+    updateKeys();
+  });
+  addEventListener('blur', clearInput);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state.screen === 'map') setPaused(true); });
+
+  // ---------- Input: touch joystick (floating, left side) ----------
+  const zone = $('#stick-zone'), stick = $('#stick'), knob = $('#knob');
+  function placeStick(x, y) { stick.style.left = x + 'px'; stick.style.top = y + 'px'; }
+  function resetStick() {
+    const st = state.stick; st.active = false; st.id = null; st.dx = st.dy = 0;
+    knob.style.transform = '';
+    stick.classList.add('idle');
+    placeStick(96, stage.offsetHeight - 120);   // home position, bottom-left
+  }
+  function toLocal(e) {   // client → stage coords (handles the scaled desktop stage too)
+    const r = stage.getBoundingClientRect(), sc = r.width / stage.offsetWidth;
+    return { x: (e.clientX - r.left) / sc, y: (e.clientY - r.top) / sc };
+  }
+  zone.addEventListener('pointerdown', e => {
+    if (state.paused || state.stick.active) return;
+    e.preventDefault();
+    zone.setPointerCapture(e.pointerId);
+    const p = toLocal(e), st = state.stick;
+    st.active = true; st.id = e.pointerId; st.ox = p.x; st.oy = p.y; st.dx = st.dy = 0;
+    placeStick(p.x, p.y); stick.classList.remove('idle');
+  });
+  zone.addEventListener('pointermove', e => {
+    const st = state.stick; if (!st.active || e.pointerId !== st.id) return;
+    const p = toLocal(e);
+    let vx = p.x - st.ox, vy = p.y - st.oy;
+    const d = Math.hypot(vx, vy);
+    if (d > STICK_R) { vx *= STICK_R / d; vy *= STICK_R / d; }
+    knob.style.transform = `translate(${vx}px, ${vy}px)`;
+    st.dx = vx / STICK_R; st.dy = vy / STICK_R;
+  });
+  const endStick = e => { if (e.pointerId === state.stick.id) resetStick(); };
+  zone.addEventListener('pointerup', endStick);
+  zone.addEventListener('pointercancel', endStick);
+  zone.addEventListener('lostpointercapture', endStick);
+
+  // RUN button (hold)
+  const runBtn = $('#run');
+  function setRun(on) { state.runBtn = on; runBtn.classList.toggle('on', on); }
+  runBtn.addEventListener('pointerdown', e => { e.preventDefault(); runBtn.setPointerCapture(e.pointerId); setRun(true); });
+  ['pointerup','pointercancel','lostpointercapture'].forEach(t => runBtn.addEventListener(t, () => setRun(false)));
+  runBtn.addEventListener('contextmenu', e => e.preventDefault());
+
+  // ---------- Pause ----------
+  function setPaused(p) {
+    state.paused = p; clearInput();
+    $('#paused').classList.toggle('show', p);
+    if (p) $('#resume').focus(); else $('#pause').focus({ preventScroll:true });
+  }
+  $('#pause').onclick = () => setPaused(true);
+  $('#resume').onclick = () => setPaused(false);
+  $('#change-loc').onclick = () => { setPaused(false); resetRun(); show('location'); };
+  $('#change-char').onclick = () => { setPaused(false); resetRun(); show('character'); };
+
+  // ---------- Game loop ----------
+  const toward = (from, to, max) => from + Math.max(-max, Math.min(max, to - from));
+  let last = performance.now();
+  function tick(now) {
+    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    if (state.screen === 'map' && !state.paused) {
+      const c = CHARS[state.char], st = state.stick;
+      // Input vector: joystick (analog) takes priority over keys (digital).
+      let dx, dy, mag;
+      if (st.active && Math.hypot(st.dx, st.dy) > DEAD) {
+        mag = Math.min(1, (Math.hypot(st.dx, st.dy) - DEAD) / (1 - DEAD));
+        dx = st.dx; dy = st.dy;
+      } else {
+        dx = (state.keys.has('d') ? 1 : 0) - (state.keys.has('a') ? 1 : 0);
+        dy = (state.keys.has('s') ? 1 : 0) - (state.keys.has('w') ? 1 : 0);
+        mag = 1;
+      }
+      const moving = dx || dy;
+      player.classList.toggle('walking', !!moving);
+      let blocked = false;
+      if (moving) {
+        const len = Math.hypot(dx, dy); dx /= len; dy /= len;
+        arrow.style.transform = `rotate(${Math.atan2(dx, -dy)}rad)`;
+        const running = (state.keys.has('shift') || state.runBtn) && state.stamina > 0;
+        const speed = (120 + c.stats.Speed * 1.2) * (running ? 1.7 : 1) * mag;
+        if (running) state.stamina = Math.max(0, state.stamina - dt * (45 - c.stats.Stamina * 0.3));
+        else state.stamina = Math.min(100, state.stamina + dt * 10);
+        const step = speed * dt;
+        // Resolve each axis separately so the player slides along road edges instead of sticking.
+        const nx = state.x + dx * step, ny = state.y + dy * step;
+        const okX = dx !== 0 && onRoad(nx, state.y), okY = dy !== 0 && onRoad(state.x, ny);
+        if (okX) state.x = nx;
+        if (okY) state.y = ny;
+        // Corner assist: pushing mostly sideways into a block near a cross street pulls you onto it.
+        if (dx && !okX && Math.abs(dx) >= Math.abs(dy)) {
+          const r = ROADS_H.find(r => Math.abs(state.y - r.y) <= ASSIST);
+          if (r && onRoad(state.x, toward(state.y, r.y, step))) state.y = toward(state.y, r.y, step); else blocked = true;
+        }
+        if (dy && !okY && Math.abs(dy) > Math.abs(dx)) {
+          const r = ROADS_V.find(r => Math.abs(state.x - r.x) <= ASSIST);
+          if (r && onRoad(toward(state.x, r.x, step), state.y)) state.x = toward(state.x, r.x, step); else blocked = true;
+        }
+      } else {
+        state.stamina = Math.min(100, state.stamina + dt * 18);
+      }
+      player.classList.toggle('blocked', blocked);
+      LANDMARKS.forEach((l,i) => {
+        if (!state.found.has(i) && Math.hypot(l.x - state.x, l.y - state.y) < 30) {
+          state.found.add(i); $('#lm'+i).classList.add('got'); $('#mlm'+i).style.display = 'none';
+          if (navigator.vibrate) navigator.vibrate(40);
+          updateQuest(); toast(state.found.size === LANDMARKS.length ? 'Quest complete! All landmarks found' : `Found: ${l.name}`);
+        }
+      });
+      render();
+    }
+    requestAnimationFrame(tick);
+  }
+  fit();
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>
