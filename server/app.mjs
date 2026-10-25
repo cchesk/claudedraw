@@ -135,6 +135,24 @@ export function createApp(opts = {}) {
       const ms = [...stats.upstreamMs].sort((a, b) => a - b);
       return json(req, res, 200, { ok: true, cache: { entries: cache.size, bytes }, stats: { hits: stats.hits, misses: stats.misses, errors: stats.errors, upstreamMedianMs: ms[Math.floor(ms.length / 2)] ?? null } });
     }
+    if (u.pathname === '/probe') {
+      // Diagnostics: how does each upstream respond right now, from this server's network?
+      const probe = async (url) => {
+        const t0 = Date.now(), out = { url };
+        try {
+          const st = await fetch(url.replace(/interpreter$/, 'status'), { headers: { 'User-Agent': UA }, signal: AbortSignal.timeout(10000) });
+          out.status = st.status; out.statusMs = Date.now() - t0; out.statusBody = (await st.text()).slice(0, 300);
+        } catch (e) { out.statusError = String(e?.cause?.code ?? e?.message ?? e); }
+        const t1 = Date.now();
+        try {
+          const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': UA }, body: 'data=' + encodeURIComponent('[out:json][timeout:10];way["highway"](42.3550,-71.0660,42.3556,-71.0652);out geom;'), signal: AbortSignal.timeout(20000) });
+          const t = await r.text();
+          out.tinyQuery = { status: r.status, ms: Date.now() - t1, bytes: t.length, head: t.slice(0, 120) };
+        } catch (e) { out.tinyQuery = { error: String(e?.cause?.code ?? e?.message ?? e), ms: Date.now() - t1 }; }
+        return out;
+      };
+      return json(req, res, 200, await Promise.all(upstreams.map(probe)));
+    }
     if (u.pathname !== '/overpass') return json(req, res, 404, { error: 'not found' });
     const q = parse(u);
     if (q.error) return json(req, res, 400, { error: q.error });

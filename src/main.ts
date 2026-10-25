@@ -5,6 +5,7 @@ import { clearInput, state, type GameState } from './state';
 import { initCharacter } from './screens/character';
 import { initLocation, showLocation } from './screens/location';
 import { initLoading, startLoading } from './screens/loading';
+import { warmProxy } from './geo/overpass';
 import { initExplore, enterExplore, leaveExplore, resizeExplore } from './screens/explore';
 
 const stage = document.getElementById('stage')!;
@@ -40,6 +41,7 @@ addEventListener('resize', fit);
 addEventListener('orientationchange', () => setTimeout(fit, 250));
 window.visualViewport?.addEventListener('resize', fit);
 
+if (!state.demo) warmProxy();
 initCharacter(go);
 initLocation(go);
 initLoading(go);
