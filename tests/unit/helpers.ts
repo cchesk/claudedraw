@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { buildMap, type OverpassData } from '../../src/map/build';
+import type { OverpassData } from '../../src/map/build';
+import { buildMap } from '../../src/map/world';
 import { demoData } from '../../src/map/demo';
 
 export const FIXTURES = ['downtown', 'suburb', 'park'] as const;

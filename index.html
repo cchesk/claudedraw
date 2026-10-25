@@ -125,7 +125,7 @@
 
   <div class="hud hud-quest">
     <div style="display:flex;justify-content:space-between;align-items:center">
-      <span class="eyebrow" style="color:var(--lime)">CURRENT QUEST</span>
+      <span class="eyebrow" id="quest-label" style="color:var(--lime)">CURRENT QUEST</span>
       <span id="quest-count" style="font-family:var(--mono);font-size:12px;color:var(--muted)">0 / 3</span>
     </div>
     <span id="quest-title" class="qt">Find 3 landmarks nearby</span>
@@ -140,6 +140,7 @@
     <div class="keys" aria-hidden="true"><span></span><kbd data-k="w">W</kbd><span></span><kbd data-k="a">A</kbd><kbd data-k="s">S</kbd><kbd data-k="d">D</kbd></div>
   </div>
 
+  <div class="netnote" id="net-note" role="status" aria-live="polite" hidden></div>
   <span class="attrib attrib-map">© OpenStreetMap contributors</span>
   <div class="toast" id="toast" role="status"></div>
 

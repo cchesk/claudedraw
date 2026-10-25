@@ -3,8 +3,7 @@ import { advance, distToSegment, isWalkable, nearestRoadPoint, segmentsAt, stepM
 import { demoMap, FIXTURES, loadFixture } from './helpers';
 
 const demo = demoMap();
-const maple = demo.ways.findIndex((w) => w.name === 'Maple St');
-const mapleSeg = demo.segments.find((s) => s.way === maple)!;
+const mapleSeg = demo.segments.find((s) => demo.ways[s.way].name === 'Maple St' && s.len > 400)!; // a mid-block stretch
 
 describe('isWalkable (spec §7)', () => {
   it('is true on a centreline and within the half-width, false just outside', () => {
@@ -13,23 +12,23 @@ describe('isWalkable (spec §7)', () => {
     expect(isWalkable(demo, mx, my + mapleSeg.hw - 1)).toBe(true);
     expect(isWalkable(demo, mx, my + mapleSeg.hw + 1)).toBe(false);
   });
-  it('is false off-map, inside the 20px edge inset, and for NaN', () => {
-    expect(isWalkable(demo, -5, 100)).toBe(false);
-    expect(isWalkable(demo, 10, my(mapleSeg))).toBe(false);
-    expect(isWalkable(demo, demo.width + 5, 100)).toBe(false);
+  it('is false wherever no street data is loaded, and for NaN/Infinity', () => {
+    expect(isWalkable(demo, 100000, 100000)).toBe(false);
+    expect(isWalkable(demo, -100000, 0)).toBe(false);
     expect(isWalkable(demo, NaN, 5)).toBe(false);
+    expect(isWalkable(demo, Infinity, 5)).toBe(false);
   });
   it('is false inside buildings, parks, water and on footpaths (fixtures)', () => {
     for (const n of FIXTURES) {
       const { map } = loadFixture(n);
       let checked = 0;
-      for (const a of map.areas) {
+      for (const a of map.chunks.get('0,0')!.areas) {
         const c = { x: (a.bbox[0] + a.bbox[2]) / 2, y: (a.bbox[1] + a.bbox[3]) / 2 };
         // only assert for area centres that are not themselves within a street band (large parks can contain streets)
         if (a.kind === 'building' && segmentsAt(map, c.x, c.y).length === 0) { expect(isWalkable(map, c.x, c.y)).toBe(false); checked++; }
       }
       expect(checked).toBeGreaterThan(5);
-      for (const r of map.roads.filter((r) => r.kind === 'path').slice(0, 80)) {
+      for (const r of map.chunks.get('0,0')!.roads.filter((r) => r.kind === 'path').slice(0, 80)) {
         const p = r.pts[Math.floor(r.pts.length / 2)];
         if (segmentsAt(map, p.x, p.y).length === 0) expect(isWalkable(map, p.x, p.y)).toBe(false);
       }

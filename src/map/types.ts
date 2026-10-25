@@ -5,37 +5,28 @@ export interface Segment {
   hw: number;            // walkable half-width
   dx: number; dy: number; // unit direction a->b
   len: number;
-  way: number;           // index into MapModel.ways
+  way: number;           // index into World.ways
+  nk: string;            // graph node key of endpoint a (for connectivity)
 }
 
-export interface WayInfo { name: string; cls: string; hw: number; nodes: number[] /* intersection ids */ }
+export interface WayInfo { name: string; cls: string; hw: number }
 
 export interface Intersection { x: number; y: number; names: string[]; dirs: Vec[] }
 
-export interface Road { pts: Vec[]; cls: string; hw: number; way: number; walkable: boolean; kind: 'street' | 'path' | 'other' }
+export type BBox4 = [number, number, number, number];
+
+export interface Road { pts: Vec[]; cls: string; hw: number; walkable: boolean; kind: 'street' | 'path' | 'other'; bbox: BBox4 }
 
 export type AreaKind = 'grass' | 'wood' | 'water' | 'building' | 'buildingTall';
-export interface Area { kind: AreaKind; rings: Vec[][]; bbox: [number, number, number, number]; size: number }
+export interface Area { kind: AreaKind; rings: Vec[][]; bbox: BBox4; size: number; key: string }
 
-export interface Poi { name: string; x: number; y: number; cat: string; rarity: number }
+export interface Poi { name: string; x: number; y: number; cat: string; rarity: number; key: string }
 
-export interface Landmark { name: string; x: number; y: number; poiX: number; poiY: number; cat: string }
+export interface Landmark { name: string; x: number; y: number; poiX: number; poiY: number; cat: string; key?: string }
 
 export interface Label { text: string; x: number; y: number; angle: number }
 
-export interface MapModel {
-  origin: { lat: number; lng: number };
-  width: number; height: number; pxPerM: number;
-  roads: Road[];
-  areas: Area[];
-  labels: Label[];
-  pois: Poi[];
-  segments: Segment[];
-  ways: WayInfo[];
-  intersections: Intersection[];
-  hash: SpatialHash;
-  /** world position of the geocoded origin */
-  originPx: Vec;
-}
+/** Render data for one fetched chunk: every feature intersecting the chunk, in world px. */
+export interface Chunk { i: number; j: number; roads: Road[]; areas: Area[] }
 
-export interface SpatialHash { cell: number; cols: number; rows: number; cells: Int32Array[] | number[][] }
+export type { World as MapModel } from './world';

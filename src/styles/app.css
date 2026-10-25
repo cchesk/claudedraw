@@ -229,3 +229,8 @@ body.fluid .loading-title{font-size:34px}
   body.fluid .hud-street,body.fluid:not(.touch) .hud-street{bottom:auto;top:calc(var(--g) + var(--sat))}
   body.fluid .toast{top:calc(var(--sat) + 64px)}
 }
+
+.netnote{position:absolute;left:50%;transform:translateX(-50%);top:calc(var(--g) + var(--sat) + 120px);z-index:4;padding:8px 14px;border-radius:999px;
+  background:rgba(15,21,33,.92);border:1px solid var(--line);font-family:var(--mono);font-size:12px;color:var(--sky);pointer-events:none;white-space:nowrap}
+.netnote[hidden]{display:none}
+.netnote.err{color:#FF9C85}

@@ -1,10 +1,6 @@
 import { PX_PER_M } from '../config';
 
-export interface Projector {
-  lat0: number; lng0: number; pxPerM: number;
-  /** world px of the bbox top-left corner, in unshifted projected px */
-  offX: number; offY: number;
-}
+export interface Projector { lat0: number; lng0: number; pxPerM: number }
 
 const M_LNG = 111320;
 const M_LAT = 110540;
@@ -17,22 +13,28 @@ export function rawProject(lat0: number, lng0: number, lat: number, lng: number,
   };
 }
 
-export function makeProjector(lat0: number, lng0: number, halfM: number, pxPerM = PX_PER_M): Projector {
-  return { lat0, lng0, pxPerM, offX: -halfM * pxPerM, offY: -halfM * pxPerM };
+/** The world is unbounded: the geocoded origin is (0,0), +x east, +y south. */
+export function makeProjector(lat0: number, lng0: number, pxPerM = PX_PER_M): Projector {
+  return { lat0, lng0, pxPerM };
 }
 
-/** lat/lng -> world px, with the bbox's top-left at (0,0). */
 export function toWorld(p: Projector, lat: number, lng: number) {
-  const r = rawProject(p.lat0, p.lng0, lat, lng, p.pxPerM);
-  return { x: r.x - p.offX, y: r.y - p.offY };
+  return rawProject(p.lat0, p.lng0, lat, lng, p.pxPerM);
 }
 
 export function toLatLng(p: Projector, x: number, y: number) {
-  const rx = x + p.offX, ry = y + p.offY;
   return {
-    lat: p.lat0 - ry / (M_LAT * p.pxPerM),
-    lng: p.lng0 + rx / (Math.cos((p.lat0 * Math.PI) / 180) * M_LNG * p.pxPerM),
+    lat: p.lat0 - y / (M_LAT * p.pxPerM),
+    lng: p.lng0 + x / (Math.cos((p.lat0 * Math.PI) / 180) * M_LNG * p.pxPerM),
   };
+}
+
+export interface BBox { south: number; west: number; north: number; east: number }
+
+/** lat/lng bbox of a world-px rectangle (consistent with toWorld, so chunks tile without gaps). */
+export function bboxOfRect(p: Projector, x0: number, y0: number, x1: number, y1: number): BBox {
+  const nw = toLatLng(p, x0, y0), se = toLatLng(p, x1, y1);
+  return { south: se.lat, north: nw.lat, west: nw.lng, east: se.lng };
 }
 
 /** Half-extents in degrees of a square of `halfM` metres around lat0. */

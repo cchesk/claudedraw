@@ -3,7 +3,7 @@ import { createGeocoder, type Place } from '../geo/geocoder';
 import { OverpassError } from '../geo/overpass';
 import { view } from '../layout';
 import { loadMap } from '../map/pipeline';
-import { LOW, paintMap } from '../map/render';
+import { LOW, paintFeatures } from '../map/render';
 import { state } from '../state';
 import { avatar } from '../ui/avatar';
 
@@ -58,9 +58,11 @@ async function drawPreview(p: Place) {
     const s = Math.max(w, h) / 700;
     ctx.setTransform(k, 0, 0, k, 0, 0);
     ctx.fillStyle = '#172033'; ctx.fillRect(0, 0, w, h);
-    ctx.translate(w / 2 - map.originPx.x * s, h * 0.44 - map.originPx.y * s);
+    ctx.translate(w / 2, h * 0.44);
     ctx.scale(s, s);
-    paintMap(ctx, map, LOW);
+    const chunk = map.chunks.get('0,0')!;
+    const half = (Math.max(w, h) / s) / 2 + 40;
+    paintFeatures(ctx, chunk.roads, chunk.areas, { x0: -half, y0: -half - 200, x1: half, y1: half + 200 }, LOW);
     box.classList.add('has-map', 'has-pin');
   } catch (e) {
     if (ctl.signal.aborted) return;

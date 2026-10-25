@@ -13,6 +13,7 @@ export interface GameState {
   stamina: number;
   found: Set<number>;
   landmarks: Landmark[];
+  quest: number;
   input: { keys: Set<string>; stick: { active: boolean; x: number; y: number }; run: boolean };
   paused: boolean;
   touch: boolean;
@@ -29,6 +30,7 @@ export const state: GameState = {
   stamina: 100,
   found: new Set(),
   landmarks: [],
+  quest: 1,
   input: { keys: new Set(), stick: { active: false, x: 0, y: 0 }, run: false },
   paused: false,
   touch: false,

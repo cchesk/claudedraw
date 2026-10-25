@@ -1,5 +1,6 @@
-import { ASSIST_ANGLE, ASSIST_RADIUS, BOUNDS_INSET } from '../config';
+import { ASSIST_ANGLE, ASSIST_RADIUS, HASH_CELL } from '../config';
 import type { MapModel, Segment, Vec } from './types';
+import { cellKey } from './world';
 
 export interface SegHit { d: number; t: number; cx: number; cy: number }
 
@@ -12,19 +13,14 @@ export function distToSegment(px: number, py: number, s: Segment): SegHit {
   return { d: Math.hypot(px - cx, py - cy), t, cx, cy };
 }
 
-export function inBounds(m: MapModel, x: number, y: number) {
-  return x >= BOUNDS_INSET && y >= BOUNDS_INSET && x <= m.width - BOUNDS_INSET && y <= m.height - BOUNDS_INSET;
-}
-
+const EMPTY: number[] = [];
 function cellOf(m: MapModel, x: number, y: number) {
-  const { cell, cols, rows } = m.hash;
-  const cx = Math.min(cols - 1, Math.max(0, Math.floor(x / cell))), cy = Math.min(rows - 1, Math.max(0, Math.floor(y / cell)));
-  return (m.hash.cells as number[][])[cy * cols + cx];
+  return m.hash.get(cellKey(Math.floor(x / HASH_CELL), Math.floor(y / HASH_CELL))) ?? EMPTY;
 }
 
 /** Segments whose walkable band contains the point, nearest first. */
 export function segmentsAt(m: MapModel, x: number, y: number): { seg: Segment; hit: SegHit }[] {
-  if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x > m.width || y > m.height) return [];
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return [];
   const out: { seg: Segment; hit: SegHit }[] = [];
   for (const i of cellOf(m, x, y)) {
     const seg = m.segments[i];
@@ -34,9 +30,9 @@ export function segmentsAt(m: MapModel, x: number, y: number): { seg: Segment; h
   return out.sort((a, b) => a.hit.d / a.seg.hw - b.hit.d / b.seg.hw);
 }
 
-/** Spec §7: inside bounds (inset) AND within some walkable segment's half-width. */
+/** Spec §7: within some walkable segment's half-width. Anywhere without loaded street data is never walkable. */
 export function isWalkable(m: MapModel, x: number, y: number): boolean {
-  if (!Number.isFinite(x) || !Number.isFinite(y) || !inBounds(m, x, y)) return false;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
   for (const i of cellOf(m, x, y)) {
     const seg = m.segments[i];
     if (distToSegment(x, y, seg).d <= seg.hw) return true;
@@ -46,7 +42,7 @@ export function isWalkable(m: MapModel, x: number, y: number): boolean {
 
 export interface RoadPoint extends Vec { dist: number; seg: Segment }
 
-/** Nearest point on any walkable centreline. Segments are pre-clipped to the bounds, so the result is always walkable. */
+/** Nearest point on any walkable centreline (optionally only segments passing `filter`); always walkable. */
 export function nearestRoadPoint(m: MapModel, x: number, y: number, filter?: (s: Segment) => boolean): RoadPoint | null {
   let best: RoadPoint | null = null;
   for (const seg of m.segments) {

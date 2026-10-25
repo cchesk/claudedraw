@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { isWalkable, nearestRoadPoint } from '../../src/map/collision';
 import { findSpawn, pickLandmarks } from '../../src/map/spawn';
-import { buildMap } from '../../src/map/build';
+import { buildMap } from '../../src/map/world';
 import { demoMap, FIXTURES, loadFixture, rng } from './helpers';
 
 describe.each(FIXTURES)('spawn and landmarks on %s', (name) => {
@@ -13,7 +13,7 @@ describe.each(FIXTURES)('spawn and landmarks on %s', (name) => {
     expect(s.street.length).toBeGreaterThan(0);
   });
   it('an origin inside a park / building / water still snaps to a street', () => {
-    for (const a of map.areas.filter((a) => a.kind !== 'buildingTall').slice(0, 40)) {
+    for (const a of map.chunks.get('0,0')!.areas.filter((a) => a.kind !== 'buildingTall').slice(0, 40)) {
       const c = { x: (a.bbox[0] + a.bbox[2]) / 2, y: (a.bbox[1] + a.bbox[3]) / 2 };
       const p = nearestRoadPoint(map, c.x, c.y)!;
       expect(isWalkable(map, p.x, p.y)).toBe(true);
@@ -39,7 +39,7 @@ describe.each(FIXTURES)('spawn and landmarks on %s', (name) => {
 describe('fallbacks', () => {
   it('fills with "Hidden spot" street points when there are no POIs', () => {
     const base = demoMap();
-    const m = { ...base, pois: [] };
+    const m = Object.assign(Object.create(Object.getPrototypeOf(base)), base, { pois: [] }) as typeof base;
     const sp = findSpawn(m)!;
     const l = pickLandmarks(m, sp, 50, rng(3));
     expect(l).toHaveLength(3);

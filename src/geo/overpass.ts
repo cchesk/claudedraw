@@ -1,13 +1,14 @@
-import { BBOX_HALF_M, CACHE_TTL_MS, OVERPASS_URLS } from '../config';
+import { CACHE_TTL_MS, OVERPASS_URLS } from '../config';
 import type { OverpassData } from '../map/build';
-import { bboxFor } from './project';
+import type { BBox } from './project';
 
 export const roundCoord = (n: number) => Math.round(n * 1e4) / 1e4;
-export const cacheKey = (lat: number, lng: number, halfM: number) => `${roundCoord(lat)},${roundCoord(lng)},${halfM}`;
+/** Cache by rounded origin + radius + chunk index (spec §6.2). */
+export const chunkCacheKey = (lat0: number, lng0: number, half: number, i: number, j: number) =>
+  `${roundCoord(lat0)},${roundCoord(lng0)},${half},${i},${j}`;
 
-/** One Overpass query for everything the map needs (spec §6.2). */
-export function buildQuery(lat: number, lng: number, halfM: number): string {
-  const b = bboxFor(lat, lng, halfM);
+/** One Overpass query for everything the map needs inside a bbox (spec §6.2). */
+export function buildQuery(b: BBox): string {
   const bb = `${b.south.toFixed(6)},${b.west.toFixed(6)},${b.north.toFixed(6)},${b.east.toFixed(6)}`;
   return `[out:json][timeout:25];(
 way["highway"](${bb});
@@ -104,15 +105,13 @@ async function fetchRemote(query: string, signal?: AbortSignal): Promise<Overpas
   throw lastErr;
 }
 
-/** Cached, de-duplicated, abortable fetch of the OSM data around a point. */
-export async function fetchOsm(lat: number, lng: number, halfM = BBOX_HALF_M, signal?: AbortSignal): Promise<OverpassData> {
-  const key = cacheKey(lat, lng, halfM);
+/** Cached, de-duplicated, abortable fetch of one chunk's OSM data. */
+export async function fetchChunk(key: string, bbox: BBox, signal?: AbortSignal): Promise<OverpassData> {
   const cached = await cacheGet(key);
   if (cached) return cached;
   let p = inflight.get(key);
   if (!p) {
-    // Shared in-flight promise must not die with one caller's signal, so the network call is un-signalled when shared.
-    p = fetchRemote(buildQuery(roundCoord(lat), roundCoord(lng), halfM), signal)
+    p = fetchRemote(buildQuery(bbox), signal)
       .then(async (d) => { await cachePut(key, d); return d; })
       .finally(() => inflight.delete(key));
     inflight.set(key, p);
@@ -121,7 +120,7 @@ export async function fetchOsm(lat: number, lng: number, halfM = BBOX_HALF_M, si
     return await p;
   } catch (e) {
     // The shared request may have been aborted by another caller; retry once if we were not the one who aborted.
-    if (e instanceof OverpassError && e.kind === 'aborted' && !signal?.aborted) return fetchOsm(lat, lng, halfM, signal);
+    if (e instanceof OverpassError && e.kind === 'aborted' && !signal?.aborted) return fetchChunk(key, bbox, signal);
     throw e;
   }
 }
