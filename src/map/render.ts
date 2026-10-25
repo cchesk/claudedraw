@@ -109,9 +109,14 @@ export class TileCache {
   private tick = 0;
   scale = 1;
   readonly px: number;
-  constructor(private world: World, private max = 48) { this.px = world.mode === 'mercator' ? 512 : (world.half * PX_PER_M) / 2; }
+  constructor(private world: World, private max = 48, private makeCanvas: () => HTMLCanvasElement = () => document.createElement('canvas')) { this.px = world.mode === 'mercator' ? 512 : (world.half * PX_PER_M) / 2; }
 
-  setScale(s: number) { if (Math.abs(s - this.scale) / this.scale > 0.25) { this.scale = s; this.tiles.clear(); } }
+  /** Re-rendering is skipped for tiles that fit: allow as many as ~96 MB of tile bitmaps (at least 24, so a window always fits). */
+  setScale(s: number) {
+    if (Math.abs(s - this.scale) / this.scale <= 0.25) return;
+    this.scale = s; this.tiles.clear();
+    this.max = Math.max(24, Math.min(96, Math.floor(96e6 / (4 * (this.px * s) ** 2))));
+  }
   clear() { this.tiles.clear(); }
 
   private rect(tx: number, ty: number): Rect { return { x0: tx * this.px, y0: ty * this.px, x1: (tx + 1) * this.px, y1: (ty + 1) * this.px }; }
@@ -134,14 +139,15 @@ export class TileCache {
     if (!sig) return t?.canvas ?? null;
     if (!t || (canCreate && t.sig !== sig)) {
       if (!canCreate) return null;
-      const c = t?.canvas ?? document.createElement('canvas');
+      const c = t?.canvas ?? this.makeCanvas();
       c.width = c.height = Math.ceil(this.px * this.scale);
       const ctx = c.getContext('2d')!;
       ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
       ctx.translate(-r.x0, -r.y0);
       const f = this.world.featuresIn(r);
       paintFeatures(ctx, f.roads, f.areas, r);
-      this.tiles.set(key, (t = { canvas: c, used: 0, sig }));
+      // mark it most-recently-used BEFORE trimming, or a full cache would evict the tile it just drew
+      this.tiles.set(key, (t = { canvas: c, used: ++this.tick, sig }));
       if (this.tiles.size > this.max) this.evict();
     }
     t.used = ++this.tick;
