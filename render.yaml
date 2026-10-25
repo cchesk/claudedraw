@@ -1,0 +1,23 @@
+# Render Blueprint: Street Quest as a Static Site (no backend).
+services:
+  - type: web
+    runtime: static
+    name: street-quest
+    repo: https://github.com/cchesk/claudedraw
+    branch: main
+    autoDeployTrigger: commit
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
